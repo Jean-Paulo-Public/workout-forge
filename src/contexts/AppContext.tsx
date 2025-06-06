@@ -15,6 +15,7 @@ interface AppContextType {
   sessions: WorkoutSession[];
   addSession: (sessionData: Pick<WorkoutSession, 'workoutId' | 'workoutName' | 'date'>) => void;
   updateSessionExercisePerformance: (sessionId: string, exerciseId: string, updates: Partial<SessionExercisePerformance>) => void;
+  markGlobalWarmupAsCompleted: (sessionId: string) => void;
   completeSession: (sessionId: string) => void;
   hasActiveSession: (workoutId: string) => boolean;
   getLastUsedWeightForExercise: (workoutId: string, exerciseId: string) => string | undefined;
@@ -78,6 +79,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       })),
       repeatFrequencyDays: workoutData.repeatFrequencyDays || undefined,
       deadline: workoutData.deadline || undefined,
+      hasGlobalWarmup: workoutData.hasGlobalWarmup !== undefined ? workoutData.hasGlobalWarmup : true,
     };
     setWorkouts((prev) => [...prev, newWorkout]);
   };
@@ -88,6 +90,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ...updatedWorkout,
         repeatFrequencyDays: updatedWorkout.repeatFrequencyDays || undefined,
         deadline: updatedWorkout.deadline || undefined,
+        hasGlobalWarmup: updatedWorkout.hasGlobalWarmup !== undefined ? updatedWorkout.hasGlobalWarmup : true,
         exercises: updatedWorkout.exercises.map(ex => ({
           ...ex,
           id: ex.id || generateId(),
@@ -120,7 +123,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       exerciseId: ex.id,
       exerciseName: ex.name,
       plannedWeight: ex.weight || "0",
-      weightUsed: ex.weight || "0", // Initialize with planned, can be overwritten by "last used" in modal
+      weightUsed: ex.weight || "0", 
+      hasWarmup: ex.hasWarmup || false,
       isWarmupCompleted: false,
       isExerciseCompleted: false,
     }));
@@ -131,6 +135,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       isCompleted: false,
       notes: `Sessão de ${sessionData.workoutName} iniciada.`,
       exercisePerformances: initialExercisePerformances,
+      isGlobalWarmupCompleted: workout.hasGlobalWarmup ? false : true,
     };
     setSessions((prev) => [newSession, ...prev]);
   };
@@ -147,6 +152,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
               }
               return perf;
             }),
+          };
+        }
+        return session;
+      })
+    );
+  }, []);
+
+  const markGlobalWarmupAsCompleted = useCallback((sessionId: string) => {
+    setSessions(prevSessions =>
+      prevSessions.map(session => {
+        if (session.id === sessionId) {
+          return {
+            ...session,
+            isGlobalWarmupCompleted: true,
+            notes: `${session.notes || ''} Aquecimento geral concluído.`,
           };
         }
         return session;
@@ -196,6 +216,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     sessions,
     addSession,
     updateSessionExercisePerformance,
+    markGlobalWarmupAsCompleted,
     completeSession,
     hasActiveSession,
     getLastUsedWeightForExercise,

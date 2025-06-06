@@ -19,6 +19,7 @@ export interface Workout {
   exercises: Exercise[];
   repeatFrequencyDays?: number;
   deadline?: string; // ISO Date string for deadline (opcional)
+  hasGlobalWarmup?: boolean; // New field for general warm-up
 }
 
 export interface SessionExercisePerformance {
@@ -26,6 +27,7 @@ export interface SessionExercisePerformance {
   exerciseName: string; // Denormalized for easier display
   plannedWeight?: string; // Weight from the workout plan
   weightUsed?: string; // Actual weight used in this session for this exercise
+  hasWarmup?: boolean; // Copied from exercise for easier access in modal
   isWarmupCompleted?: boolean; // Tracks if the warmup for this specific exercise is done
   isExerciseCompleted?: boolean; // Tracks if this specific exercise is done
 }
@@ -38,6 +40,7 @@ export interface WorkoutSession {
   isCompleted: boolean; // Overall session completion
   notes?: string;
   exercisePerformances: SessionExercisePerformance[]; // Tracks actual performance for each exercise
+  isGlobalWarmupCompleted?: boolean; // Tracks if the general warm-up for the session is done
 }
 
 export interface UserSettings {

@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Trash2, Save, Target, BookOpenCheck, CalendarIcon } from 'lucide-react';
+import { PlusCircle, Trash2, Save, Target, BookOpenCheck, CalendarIcon, Flame } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import type { Exercise, ModelExercise, Workout } from '@/lib/types';
@@ -77,6 +77,7 @@ const exerciseSchema = baseExerciseSchema.superRefine((data, ctx) => {
 const workoutFormSchema = z.object({
   name: z.string().min(3, "O nome do treino deve ter pelo menos 3 caracteres."),
   description: z.string().optional(),
+  hasGlobalWarmup: z.boolean().optional(),
   exercises: z.array(exerciseSchema)
     .transform(exercises => {
       return exercises.filter(ex => ex.name.trim() !== '');
@@ -95,7 +96,7 @@ type WorkoutFormData = z.infer<typeof workoutFormSchema>;
 const generateId = () => crypto.randomUUID();
 
 function determineModelExerciseWarmup(exerciseDetails?: ModelExercise): boolean {
-  if (!exerciseDetails) return true; // Default to true if no details (though should not happen for model)
+  if (!exerciseDetails) return true; 
 
   const nameLower = exerciseDetails.name.toLowerCase();
   const isCardio = exerciseDetails.muscleGroups.includes('Cardio');
@@ -104,9 +105,8 @@ function determineModelExerciseWarmup(exerciseDetails?: ModelExercise): boolean 
   if (nameLower === 'prancha abdominal') return false;
   if (nameLower === 'alongamento (geral)') return false;
   if (isCardio && !isHIIT) return false;
-  // Could add more specific bodyweight/core/flexibility exercises here if needed
-
-  return true; // Default to true for other model exercises
+  
+  return true; 
 }
 
 
@@ -129,6 +129,7 @@ export default function WorkoutBuilderPage() {
     defaultValues: {
       name: '',
       description: '',
+      hasGlobalWarmup: true,
       exercises: [],
       repeatFrequencyDays: undefined,
       deadline: undefined,
@@ -144,7 +145,6 @@ export default function WorkoutBuilderPage() {
 
   const updateWorkoutFrequencyAndSuggestDeadline = useCallback((exercisesInput?: z.infer<typeof baseExerciseSchema>[]) => {
     let maxSuggestedFrequency = 0;
-    // Use provided exercises or get from form, then filter for valid ones
     const exercisesToEvaluate = (exercisesInput || form.getValues('exercises'))
                                 .filter(ex => ex.name && ex.name.trim() !== '');
 
@@ -164,7 +164,6 @@ export default function WorkoutBuilderPage() {
 
       if (currentFrequency === 0 || currentFrequency < maxSuggestedFrequency) {
          form.setValue('repeatFrequencyDays', maxSuggestedFrequency, { shouldDirty: true });
-         // This will trigger the useEffect for watchedRepeatFrequencyDays to suggest a deadline
       }
     }
   }, [form]);
@@ -189,6 +188,7 @@ export default function WorkoutBuilderPage() {
         form.reset({
           name: workoutToEdit.name,
           description: workoutToEdit.description || '',
+          hasGlobalWarmup: workoutToEdit.hasGlobalWarmup !== undefined ? workoutToEdit.hasGlobalWarmup : true,
           exercises: formExercises,
           repeatFrequencyDays: workoutToEdit.repeatFrequencyDays || undefined,
           deadline: workoutToEdit.deadline ? parseISO(workoutToEdit.deadline) : undefined,
@@ -208,6 +208,7 @@ export default function WorkoutBuilderPage() {
       form.reset({
         name: '',
         description: '',
+        hasGlobalWarmup: true,
         exercises: [{
           id: generateId(),
           name: '',
@@ -316,6 +317,7 @@ export default function WorkoutBuilderPage() {
       id: editingWorkoutId || generateId(),
       name: values.name,
       description: values.description,
+      hasGlobalWarmup: values.hasGlobalWarmup,
       exercises: values.exercises.map(ex => ({
         id: ex.id || generateId(),
         name: ex.name,
@@ -348,6 +350,7 @@ export default function WorkoutBuilderPage() {
         form.reset({
             name: '',
             description: '',
+            hasGlobalWarmup: true,
             exercises: [{
                 id: generateId(),
                 name: '',
@@ -403,6 +406,29 @@ export default function WorkoutBuilderPage() {
                         <Textarea placeholder="ex: Foco em movimentos compostos, 60s de descanso." {...field} />
                       </FormControl>
                       <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="hasGlobalWarmup"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                       <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          id="hasGlobalWarmup"
+                        />
+                      </FormControl>
+                      <div className="space-y-0.5">
+                        <Label htmlFor="hasGlobalWarmup" className="font-normal cursor-pointer">
+                          Incluir aquecimento geral na esteira?
+                        </Label>
+                        <FormDescription className="text-xs">
+                           Se marcado, um passo "Concluir Aquecimento (Geral)" aparecerá na tela de progresso antes de acompanhar os exercícios.
+                        </FormDescription>
+                      </div>
                     </FormItem>
                   )}
                 />
@@ -566,7 +592,7 @@ export default function WorkoutBuilderPage() {
                             />
                           </FormControl>
                           <Label htmlFor={`hasWarmup-${index}`} className="font-normal cursor-pointer">
-                            Incluir série de aquecimento?
+                            Incluir série de aquecimento para este exercício?
                           </Label>
                         </FormItem>
                       )}
@@ -619,6 +645,7 @@ export default function WorkoutBuilderPage() {
                 <FormDescription className="text-xs">
                     Exercícios modelo são sugestões e não constituem uma recomendação de treino profissional. Ajuste conforme suas necessidades.
                     Séries de aquecimento em exercícios modelo são marcadas por padrão, exceto para alguns exercícios específicos (ex: Cardio regular, Prancha).
+                    O aquecimento geral do treino (na esteira) pode ser configurado nos Detalhes do Treino.
                 </FormDescription>
 
               </CardContent>

@@ -23,6 +23,7 @@ export interface WorkoutTemplate {
   name: string;
   description: string;
   targetMuscleGroups: { group: string; count: number }[];
+  hasGlobalWarmup?: boolean;
 }
 
 export const workoutTemplates: Record<string, WorkoutTemplate> = {
@@ -35,6 +36,7 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
       { group: 'Glúteos', count: 2 },
       { group: 'Panturrilhas', count: 2 },
     ],
+    hasGlobalWarmup: true,
   },
   "Braços": {
     name: "Treino Modelo - Braços",
@@ -44,14 +46,16 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
       { group: 'Tríceps', count: 2 },
       { group: 'Antebraço', count: 2 },
     ],
+    hasGlobalWarmup: true,
   },
   "Ombros": {
     name: "Treino Modelo - Ombros e Trapézio",
     description: "Um treino para desenvolver deltoides e trapézio.",
     targetMuscleGroups: [
       { group: 'Ombros', count: 2 },
-      { group: 'Trapézio', count: 2 },
+      { group: 'Trapézio', count: 2 }, // Trapézio já está nos modelos de ombro, pode ser redundante adicioná-lo aqui.
     ],
+    hasGlobalWarmup: true,
   },
   "Peitoral": {
     name: "Treino Modelo - Peitoral",
@@ -59,14 +63,16 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
     targetMuscleGroups: [
       { group: 'Peito', count: 2 },
     ],
+    hasGlobalWarmup: true,
   },
   "Costas": {
     name: "Treino Modelo - Costas",
     description: "Um treino para construir costas largas e densas.",
     targetMuscleGroups: [
       { group: 'Costas', count: 2 },
-      // Consider adding { group: 'Lombar', count: 1 } if desired for more completeness
+      // { group: 'Lombar', count: 1 } // Lombar está em Core e Acessórios
     ],
+    hasGlobalWarmup: true,
   },
   "Core e Acessórios": {
     name: "Treino Modelo - Core e Acessórios",
@@ -75,6 +81,7 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
       { group: 'Abdômen', count: 2 },
       { group: 'Lombar', count: 1 },
     ],
+    hasGlobalWarmup: true,
   }
 };
 
@@ -120,9 +127,6 @@ export function generateWorkoutFromTemplate(
 
   if (exercises.length === 0) {
       console.warn(`Nenhum exercício gerado para o modelo: ${templateKey}`);
-      // Optionally, return a workout with a message or handle differently
-      // For now, returning null if absolutely no exercises are generated.
-      // But it should ideally pick at least one if any category has exercises.
       return null;
   }
 
@@ -130,5 +134,6 @@ export function generateWorkoutFromTemplate(
     name: template.name,
     description: template.description,
     exercises,
+    hasGlobalWarmup: template.hasGlobalWarmup !== undefined ? template.hasGlobalWarmup : true,
   };
 }

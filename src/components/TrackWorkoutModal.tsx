@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import type { Workout, WorkoutSession, SessionExercisePerformance, Exercise as WorkoutExercise } from '@/lib/types';
+import type { Workout, WorkoutSession, SessionExercisePerformance } from '@/lib/types';
 import { useAppContext } from '@/contexts/AppContext';
 import { Flame, CheckCircle2, Save } from 'lucide-react';
 import { Label } from '@/components/ui/label';
@@ -24,8 +24,8 @@ const exercisePerformanceSchema = z.object({
   isWarmupCompleted: z.boolean().optional(),
   weightUsed: z.string().optional(),
   isExerciseCompleted: z.boolean().optional(),
-  plannedWeight: z.string().optional(), // For display
-  lastUsedWeight: z.string().optional(), // For display
+  plannedWeight: z.string().optional(), 
+  lastUsedWeight: z.string().optional(), 
 });
 
 const trackWorkoutFormSchema = z.object({
@@ -39,7 +39,7 @@ interface TrackWorkoutModalProps {
   onClose: () => void;
   session: WorkoutSession;
   workout: Workout;
-  onWorkoutFinallyCompleted: () => void; // Callback after session is marked complete
+  onWorkoutFinallyCompleted: () => void; 
 }
 
 export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkoutFinallyCompleted }: TrackWorkoutModalProps) {
@@ -68,7 +68,6 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
           exerciseName: exercise.name,
           hasWarmup: exercise.hasWarmup || false,
           isWarmupCompleted: currentPerf?.isWarmupCompleted || false,
-          // Prioritize current session's weightUsed, then last used, then planned, then "0"
           weightUsed: currentPerf?.weightUsed ?? lastUsedWeight ?? exercise.weight ?? "0",
           isExerciseCompleted: currentPerf?.isExerciseCompleted || false,
           plannedWeight: exercise.weight || "0",
@@ -79,50 +78,42 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
     }
   }, [isOpen, session, workout, form, getLastUsedWeightForExercise]);
 
-  const handlePerformanceChange = useCallback((index: number, fieldName: keyof SessionExercisePerformance, value: any) => {
+  const handlePerformanceChange = useCallback((index: number, fieldName: 'isWarmupCompleted' | 'isExerciseCompleted' | 'weightUsed', value: any) => {
     const currentPerformanceField = form.getValues(`performances.${index}`);
     if (!currentPerformanceField) return;
 
-    // Update the form state optimistically for UI responsiveness
     const updatedField = { ...currentPerformanceField, [fieldName]: value };
-    // This `update` is from useFieldArray, it updates the form's array field
     update(index, updatedField); 
 
-    // Persist the change to AppContext
-    // Ensure `weightUsed` is always a string, default to "0" if empty
-    const weightToSave = fieldName === 'weightUsed' ? (value === '' || value === undefined || value === null ? "0" : String(value)) : undefined;
-
-    const updatesForContext: Partial<SessionExercisePerformance> = {
-      ...(fieldName === 'isWarmupCompleted' && { isWarmupCompleted: value as boolean }),
-      ...(fieldName === 'weightUsed' && { weightUsed: weightToSave }),
-      ...(fieldName === 'isExerciseCompleted' && { isExerciseCompleted: value as boolean }),
-    };
+    const updatesForContext: Partial<SessionExercisePerformance> = {};
+    if (fieldName === 'isWarmupCompleted') {
+        updatesForContext.isWarmupCompleted = value as boolean;
+    } else if (fieldName === 'isExerciseCompleted') {
+        updatesForContext.isExerciseCompleted = value as boolean;
+    } else if (fieldName === 'weightUsed') {
+        updatesForContext.weightUsed = (value === '' || value === undefined || value === null) ? "0" : String(value);
+    }
     
-    // Filter out undefined properties before sending to context
-    const definedUpdates = Object.entries(updatesForContext).reduce((acc, [key, val]) => {
-        if (val !== undefined) acc[key as keyof SessionExercisePerformance] = val;
-        return acc;
-    }, {} as Partial<SessionExercisePerformance>);
-
-    if (Object.keys(definedUpdates).length > 0) {
-        updateSessionExercisePerformance(session.id, currentPerformanceField.exerciseId, definedUpdates);
+    if (Object.keys(updatesForContext).length > 0) {
+        updateSessionExercisePerformance(session.id, currentPerformanceField.exerciseId, updatesForContext);
     }
   }, [form, update, session.id, updateSessionExercisePerformance]);
 
 
   const allExercisesCompleted = useMemo(() => {
-    const performances = form.watch('performances'); // Watch for changes to re-evaluate
+    const performances = form.watch('performances'); 
     if (!performances || performances.length === 0) return false;
     return performances.every(p => {
       const warmupDone = p.hasWarmup ? p.isWarmupCompleted : true;
       return warmupDone && p.isExerciseCompleted;
     });
-  }, [form]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.watch('performances')]);
 
 
   const handleFinalizeWorkout = () => {
     completeSession(session.id);
-    onWorkoutFinallyCompleted(); // This will trigger deadline modal etc.
+    onWorkoutFinallyCompleted(); 
     onClose();
   };
   
@@ -138,11 +129,11 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form> {/* No onSubmit here, using button onClick for finalization */}
+          <form> 
             <ScrollArea className="h-[60vh] max-h-[calc(100vh-20rem)] my-4 pr-3">
               <div className="space-y-6">
                 {fields.map((item, index) => {
-                  const exerciseDetails = workout.exercises.find(e => e.id === item.exerciseId);
+                  // const exerciseDetails = workout.exercises.find(e => e.id === item.exerciseId);
                   return (
                   <div key={item.id} className="p-4 border rounded-md bg-card shadow-sm">
                     <h3 className="font-semibold text-lg mb-3">{item.exerciseName}</h3>
@@ -158,7 +149,7 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
                         />
                         <Label htmlFor={`warmup-${item.exerciseId}`} className="font-normal cursor-pointer flex items-center">
                           <Flame className="mr-2 h-4 w-4 text-orange-500" />
-                          Aquecimento Concluído
+                          Aquecimento deste Exercício Concluído
                         </Label>
                       </FormItem>
                     )}
@@ -183,11 +174,11 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
                               placeholder="ex: 50kg"
                               {...field}
                               value={field.value ?? ""}
-                              onBlur={(e) => { // Save on blur
+                              onBlur={(e) => { 
                                 handlePerformanceChange(index, 'weightUsed', e.target.value);
-                                field.onBlur(); // Call original onBlur for react-hook-form
+                                field.onBlur(); 
                               }}
-                              onChange={(e) => field.onChange(e.target.value)} // Let react-hook-form handle immediate input change
+                              onChange={(e) => field.onChange(e.target.value)} 
                             />
                           </FormControl>
                           <FormMessage />
