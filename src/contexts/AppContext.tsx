@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useEffect } from 'react';
-import type { Workout, WorkoutSession, ScheduledWorkout } from '@/lib/types';
+import type { Workout, WorkoutSession, ScheduledWorkout, UserSettings, Exercise } from '@/lib/types';
 
 interface AppContextType {
   workouts: Workout[];
@@ -12,63 +12,75 @@ interface AppContextType {
   getWorkoutById: (workoutId: string) => Workout | undefined;
 
   sessions: WorkoutSession[];
-  addSession: (session: Omit<WorkoutSession, 'id'>) => void;
-  // More session actions can be added if needed
+  addSession: (session: Omit<WorkoutSession, 'id' | 'isCompleted'>) => void;
+  completeSession: (sessionId: string) => void;
 
   scheduledWorkouts: ScheduledWorkout[];
   addScheduledWorkout: (scheduledWorkout: Omit<ScheduledWorkout, 'id'>) => void;
   updateScheduledWorkout: (scheduledWorkout: ScheduledWorkout) => void;
   deleteScheduledWorkout: (scheduledWorkoutId: string) => void;
+
+  userSettings: UserSettings;
+  updateUserSettings: (settings: Partial<UserSettings>) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const generateId = () => crypto.randomUUID();
 
+const DEFAULT_USER_SETTINGS: UserSettings = {
+  defaultSets: 3,
+  defaultReps: '10-12',
+};
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [sessions, setSessions] = useState<WorkoutSession[]>([]);
   const [scheduledWorkouts, setScheduledWorkouts] = useState<ScheduledWorkout[]>([]);
+  const [userSettings, setUserSettingsState] = useState<UserSettings>(DEFAULT_USER_SETTINGS);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
-    // Load from localStorage if available
     const storedWorkouts = localStorage.getItem('workouts');
-    if (storedWorkouts) {
-      setWorkouts(JSON.parse(storedWorkouts));
-    }
+    if (storedWorkouts) setWorkouts(JSON.parse(storedWorkouts));
+    
     const storedSessions = localStorage.getItem('sessions');
-    if (storedSessions) {
-      setSessions(JSON.parse(storedSessions));
-    }
+    if (storedSessions) setSessions(JSON.parse(storedSessions));
+    
     const storedScheduledWorkouts = localStorage.getItem('scheduledWorkouts');
-    if (storedScheduledWorkouts) {
-      setScheduledWorkouts(JSON.parse(storedScheduledWorkouts));
+    if (storedScheduledWorkouts) setScheduledWorkouts(JSON.parse(storedScheduledWorkouts));
+    
+    const storedUserSettings = localStorage.getItem('userSettings');
+    if (storedUserSettings) {
+      setUserSettingsState(JSON.parse(storedUserSettings));
+    } else {
+      setUserSettingsState(DEFAULT_USER_SETTINGS);
     }
   }, []);
 
   useEffect(() => {
-    if (isMounted) {
-      localStorage.setItem('workouts', JSON.stringify(workouts));
-    }
+    if (isMounted) localStorage.setItem('workouts', JSON.stringify(workouts));
   }, [workouts, isMounted]);
 
   useEffect(() => {
-    if (isMounted) {
-      localStorage.setItem('sessions', JSON.stringify(sessions));
-    }
+    if (isMounted) localStorage.setItem('sessions', JSON.stringify(sessions));
   }, [sessions, isMounted]);
   
   useEffect(() => {
-    if (isMounted) {
-      localStorage.setItem('scheduledWorkouts', JSON.stringify(scheduledWorkouts));
-    }
+    if (isMounted) localStorage.setItem('scheduledWorkouts', JSON.stringify(scheduledWorkouts));
   }, [scheduledWorkouts, isMounted]);
 
+  useEffect(() => {
+    if (isMounted) localStorage.setItem('userSettings', JSON.stringify(userSettings));
+  }, [userSettings, isMounted]);
 
   const addWorkout = (workoutData: Omit<Workout, 'id'>) => {
-    const newWorkout = { ...workoutData, id: generateId() };
+    const newWorkout: Workout = { 
+      ...workoutData, 
+      id: generateId(),
+      exercises: workoutData.exercises.map(ex => ({...ex, id: generateId()}))
+    };
     setWorkouts((prev) => [...prev, newWorkout]);
   };
 
@@ -86,9 +98,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return workouts.find(w => w.id === workoutId);
   };
 
-  const addSession = (sessionData: Omit<WorkoutSession, 'id'>) => {
-    const newSession = { ...sessionData, id: generateId() };
-    setSessions((prev) => [...prev, newSession]);
+  const addSession = (sessionData: Omit<WorkoutSession, 'id' | 'isCompleted'>) => {
+    const newSession: WorkoutSession = { ...sessionData, id: generateId(), isCompleted: false };
+    setSessions((prev) => [newSession, ...prev]); // Add to the beginning of the list
+  };
+
+  const completeSession = (sessionId: string) => {
+    setSessions(prev => 
+      prev.map(session => 
+        session.id === sessionId ? { ...session, isCompleted: true } : session
+      )
+    );
   };
 
   const addScheduledWorkout = (scheduledWorkoutData: Omit<ScheduledWorkout, 'id'>) => {
@@ -106,6 +126,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setScheduledWorkouts((prev) => prev.filter((sw) => sw.id !== scheduledWorkoutId));
   };
 
+  const updateUserSettings = (newSettings: Partial<UserSettings>) => {
+    setUserSettingsState(prev => ({ ...prev, ...newSettings }));
+  };
+
   const value = {
     workouts,
     addWorkout,
@@ -114,13 +138,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     getWorkoutById,
     sessions,
     addSession,
+    completeSession,
     scheduledWorkouts,
     addScheduledWorkout,
     updateScheduledWorkout,
     deleteScheduledWorkout,
+    userSettings,
+    updateUserSettings,
   };
 
-  if (!isMounted) return null; // Prevent hydration mismatch
+  if (!isMounted) return null; 
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

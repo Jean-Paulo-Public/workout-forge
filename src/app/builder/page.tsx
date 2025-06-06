@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -20,6 +20,7 @@ const exerciseSchema = z.object({
   name: z.string().min(2, "O nome do exercício é muito curto."),
   sets: z.coerce.number().min(1, "As séries devem ser pelo menos 1."),
   reps: z.string().min(1, "As repetições são obrigatórias."),
+  weight: z.string().optional(),
 });
 
 const workoutFormSchema = z.object({
@@ -33,7 +34,7 @@ type WorkoutFormData = z.infer<typeof workoutFormSchema>;
 const generateId = () => crypto.randomUUID();
 
 export default function WorkoutBuilderPage() {
-  const { addWorkout } = useAppContext();
+  const { addWorkout, userSettings } = useAppContext();
   const { toast } = useToast();
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
@@ -43,7 +44,12 @@ export default function WorkoutBuilderPage() {
     defaultValues: {
       name: '',
       description: '',
-      exercises: [{ name: '', sets: 3, reps: '10-12' }],
+      exercises: [{ 
+        name: '', 
+        sets: userSettings.defaultSets, 
+        reps: userSettings.defaultReps,
+        weight: '' 
+      }],
     },
   });
 
@@ -51,20 +57,46 @@ export default function WorkoutBuilderPage() {
     control: form.control,
     name: 'exercises',
   });
+  
+  // Update default exercise values if userSettings change
+  useEffect(() => {
+    if (fields.length === 0) {
+       append({ 
+        name: '', 
+        sets: userSettings.defaultSets, 
+        reps: userSettings.defaultReps,
+        weight: '' 
+      });
+    }
+  }, [userSettings, fields.length, append]);
+
 
   async function onSubmit(values: WorkoutFormData) {
     setIsSaving(true);
     const newWorkout = {
       name: values.name,
       description: values.description,
-      exercises: values.exercises.map(ex => ({ ...ex, id: generateId() } as Exercise)),
+      exercises: values.exercises.map(ex => ({ 
+        ...ex, 
+        id: generateId(),
+        weight: ex.weight || undefined // Ensure empty string becomes undefined
+      } as Exercise)),
     };
     addWorkout(newWorkout);
     toast({
       title: "Treino Salvo!",
       description: `${values.name} foi adicionado à sua biblioteca.`,
     });
-    form.reset();
+    form.reset({
+      name: '',
+      description: '',
+      exercises: [{ 
+        name: '', 
+        sets: userSettings.defaultSets, 
+        reps: userSettings.defaultReps,
+        weight: '' 
+      }],
+    });
     setIsSaving(false);
     router.push('/library');
   }
@@ -131,7 +163,7 @@ export default function WorkoutBuilderPage() {
                         </FormItem>
                       )}
                     />
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <FormField
                         control={form.control}
                         name={`exercises.${index}.sets`}
@@ -158,6 +190,19 @@ export default function WorkoutBuilderPage() {
                           </FormItem>
                         )}
                       />
+                      <FormField
+                        control={form.control}
+                        name={`exercises.${index}.weight`}
+                        render={({ field: exerciseField }) => (
+                          <FormItem>
+                            <FormLabel>Peso (Opcional)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="ex: 50kg, Peso Corporal" {...exerciseField} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
                     {fields.length > 1 && (
                        <Button
@@ -176,7 +221,12 @@ export default function WorkoutBuilderPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => append({ name: '', sets: 3, reps: '10-12' })}
+                  onClick={() => append({ 
+                    name: '', 
+                    sets: userSettings.defaultSets, 
+                    reps: userSettings.defaultReps, 
+                    weight: '' 
+                  })}
                 >
                   <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Exercício
                 </Button>

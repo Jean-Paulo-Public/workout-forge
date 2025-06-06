@@ -2,11 +2,13 @@
 
 import { AppLayout } from '@/components/layout/app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart3, History, TrendingUp } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { BarChart3, History, TrendingUp, CheckCircle2 } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useToast } from '@/hooks/use-toast';
 
 const PlaceholderChart = () => (
   <div className="w-full h-64 bg-muted rounded-md flex items-center justify-center">
@@ -16,9 +18,18 @@ const PlaceholderChart = () => (
 );
 
 export default function ProgressTrackingPage() {
-  const { sessions } = useAppContext();
+  const { sessions, completeSession } = useAppContext();
+  const { toast } = useToast();
 
   const sortedSessions = [...sessions].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const handleCompleteSession = (sessionId: string, workoutName: string) => {
+    completeSession(sessionId);
+    toast({
+      title: "Treino Finalizado!",
+      description: `A sessão de ${workoutName} foi marcada como concluída.`,
+    });
+  };
 
   return (
     <AppLayout>
@@ -45,7 +56,7 @@ export default function ProgressTrackingPage() {
                 <History className="text-primary" />
                 Histórico de Treinos
               </CardTitle>
-              <CardDescription>Revise suas sessões de treino concluídas.</CardDescription>
+              <CardDescription>Revise suas sessões de treino. Marque as sessões em andamento como finalizadas.</CardDescription>
             </CardHeader>
             <CardContent>
               {sortedSessions.length === 0 ? (
@@ -55,9 +66,29 @@ export default function ProgressTrackingPage() {
                   <ul className="space-y-3">
                     {sortedSessions.map(session => (
                       <li key={session.id} className="p-3 border rounded-md bg-background hover:bg-secondary/50 transition-colors">
-                        <p className="font-semibold">{session.workoutName}</p>
-                        <p className="text-sm text-muted-foreground">{format(new Date(session.date), 'PPP p', { locale: ptBR })}</p>
-                        {session.notes && <p className="text-xs italic mt-1 text-muted-foreground">{session.notes}</p>}
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-semibold">{session.workoutName}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Iniciado em: {format(new Date(session.date), 'PPP p', { locale: ptBR })}
+                            </p>
+                            {session.notes && <p className="text-xs italic mt-1 text-muted-foreground">{session.notes}</p>}
+                          </div>
+                          {!session.isCompleted ? (
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => handleCompleteSession(session.id, session.workoutName)}
+                              className="whitespace-nowrap"
+                            >
+                              <CheckCircle2 className="mr-2 h-4 w-4 text-green-500" /> Finalizar
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-green-600 font-medium flex items-center">
+                              <CheckCircle2 className="mr-1 h-4 w-4" /> Concluído
+                            </span>
+                          )}
+                        </div>
                       </li>
                     ))}
                   </ul>

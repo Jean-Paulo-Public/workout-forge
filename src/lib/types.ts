@@ -3,8 +3,8 @@ export interface Exercise {
   name: string;
   sets: number;
   reps: string; // e.g., "10-12", "AMRAP", "30s"
+  weight?: string; // e.g., "50kg", "Peso Corporal", "Cardio"
   // Optional fields
-  weight?: number | string; // Can be number or "bodyweight"
   duration?: string; // e.g., "60s"
   notes?: string;
 }
@@ -21,7 +21,8 @@ export interface WorkoutSession {
   id: string;
   workoutId: string; // Reference to Workout.id
   workoutName: string; // Denormalized for easy display
-  date: string; // ISO Date string
+  date: string; // ISO Date string (start date)
+  isCompleted: boolean;
   notes?: string;
   // Optional: detailed performance log per exercise
   // exercisesPerformed?: Array<Exercise & { actualSets?: number; actualReps?: string; actualWeight?: number | string }>;
@@ -33,4 +34,9 @@ export interface ScheduledWorkout {
   workoutName: string;
   dateTime: string; // ISO DateTime string
   // Optional: completed (boolean)
+}
+
+export interface UserSettings {
+  defaultSets: number;
+  defaultReps: string;
 }

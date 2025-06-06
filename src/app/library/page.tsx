@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -7,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAppContext } from '@/contexts/AppContext';
 import type { Workout, Exercise } from '@/lib/types';
-import { PlusCircle, Trash2, Edit3, Play, Eye, CalendarPlus } from 'lucide-react';
+import { PlusCircle, Trash2, Play, Eye, CalendarPlus } from 'lucide-react';
 import Link from 'next/link';
 import {
   AlertDialog,
@@ -55,6 +54,14 @@ export default function WorkoutLibraryPage() {
     router.push(`/scheduler?workoutId=${workout.id}&workoutName=${encodeURIComponent(workout.name)}`);
   };
 
+  const formatExerciseDisplay = (exercise: Exercise) => {
+    let display = `${exercise.name} (${exercise.sets} séries x ${exercise.reps})`;
+    if (exercise.weight) {
+      display += ` - Peso: ${exercise.weight}`;
+    }
+    return display;
+  };
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -95,7 +102,7 @@ export default function WorkoutLibraryPage() {
                   <h4 className="font-medium mb-1 text-sm">Exercícios:</h4>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 max-h-32 overflow-y-auto">
                     {workout.exercises.slice(0,5).map((exercise) => (
-                      <li key={exercise.id}>{exercise.name} ({exercise.sets} séries x {exercise.reps})</li>
+                      <li key={exercise.id}>{formatExerciseDisplay(exercise)}</li>
                     ))}
                     {workout.exercises.length > 5 && <li>...e mais {workout.exercises.length - 5}</li>}
                   </ul>
@@ -153,6 +160,7 @@ export default function WorkoutLibraryPage() {
                 <div key={ex.id} className="text-sm border-b pb-2">
                   <p className="font-medium">{idx + 1}. {ex.name}</p>
                   <p className="text-muted-foreground">Séries: {ex.sets}, Reps: {ex.reps}</p>
+                  {ex.weight && <p className="text-xs text-muted-foreground">Peso: {ex.weight}</p>}
                   {ex.notes && <p className="text-xs text-muted-foreground italic">Notas: {ex.notes}</p>}
                 </div>
               ))}
