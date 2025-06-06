@@ -3,7 +3,7 @@
 
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useEffect } from 'react';
-import type { Workout, WorkoutSession, ScheduledWorkout, UserSettings, Exercise } from '@/lib/types';
+import type { Workout, WorkoutSession, UserSettings, Exercise } from '@/lib/types';
 
 interface AppContextType {
   workouts: Workout[];
@@ -15,11 +15,6 @@ interface AppContextType {
   sessions: WorkoutSession[];
   addSession: (session: Omit<WorkoutSession, 'id' | 'isCompleted'>) => void;
   completeSession: (sessionId: string) => void;
-
-  scheduledWorkouts: ScheduledWorkout[];
-  addScheduledWorkout: (scheduledWorkout: Omit<ScheduledWorkout, 'id'>) => void;
-  updateScheduledWorkout: (scheduledWorkout: ScheduledWorkout) => void;
-  deleteScheduledWorkout: (scheduledWorkoutId: string) => void;
 
   userSettings: UserSettings;
   updateUserSettings: (settings: Partial<UserSettings>) => void;
@@ -37,7 +32,6 @@ const DEFAULT_USER_SETTINGS: UserSettings = {
 export function AppProvider({ children }: { children: ReactNode }) {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [sessions, setSessions] = useState<WorkoutSession[]>([]);
-  const [scheduledWorkouts, setScheduledWorkouts] = useState<ScheduledWorkout[]>([]);
   const [userSettings, setUserSettingsState] = useState<UserSettings>(DEFAULT_USER_SETTINGS);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -48,10 +42,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     
     const storedSessions = localStorage.getItem('sessions');
     if (storedSessions) setSessions(JSON.parse(storedSessions));
-    
-    const storedScheduledWorkouts = localStorage.getItem('scheduledWorkouts');
-    if (storedScheduledWorkouts) setScheduledWorkouts(JSON.parse(storedScheduledWorkouts));
-    
+        
     const storedUserSettings = localStorage.getItem('userSettings');
     if (storedUserSettings) {
       setUserSettingsState(JSON.parse(storedUserSettings));
@@ -69,10 +60,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [sessions, isMounted]);
   
   useEffect(() => {
-    if (isMounted) localStorage.setItem('scheduledWorkouts', JSON.stringify(scheduledWorkouts));
-  }, [scheduledWorkouts, isMounted]);
-
-  useEffect(() => {
     if (isMounted) localStorage.setItem('userSettings', JSON.stringify(userSettings));
   }, [userSettings, isMounted]);
 
@@ -86,6 +73,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         hasWarmup: ex.hasWarmup || false,
       })),
       repeatFrequencyDays: workoutData.repeatFrequencyDays || undefined,
+      deadline: workoutData.deadline || undefined,
     };
     setWorkouts((prev) => [...prev, newWorkout]);
   };
@@ -95,9 +83,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       prev.map((w) => (w.id === updatedWorkout.id ? {
         ...updatedWorkout,
         repeatFrequencyDays: updatedWorkout.repeatFrequencyDays || undefined,
+        deadline: updatedWorkout.deadline || undefined,
         exercises: updatedWorkout.exercises.map(ex => ({
           ...ex,
-          id: ex.id || generateId(), // Garante que exercícios adicionados na edição tenham ID
+          id: ex.id || generateId(), 
           hasWarmup: ex.hasWarmup || false,
         }))
       } : w))
@@ -137,21 +126,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
   };
 
-  const addScheduledWorkout = (scheduledWorkoutData: Omit<ScheduledWorkout, 'id'>) => {
-    const newScheduledWorkout = { ...scheduledWorkoutData, id: generateId() };
-    setScheduledWorkouts((prev) => [...prev, newScheduledWorkout]);
-  };
-
-  const updateScheduledWorkout = (updatedScheduledWorkout: ScheduledWorkout) => {
-    setScheduledWorkouts((prev) =>
-      prev.map((sw) => (sw.id === updatedScheduledWorkout.id ? updatedScheduledWorkout : sw))
-    );
-  };
-
-  const deleteScheduledWorkout = (scheduledWorkoutId: string) => {
-    setScheduledWorkouts((prev) => prev.filter((sw) => sw.id !== scheduledWorkoutId));
-  };
-
   const updateUserSettings = (newSettings: Partial<UserSettings>) => {
     setUserSettingsState(prev => ({ ...prev, ...newSettings }));
   };
@@ -165,10 +139,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     sessions,
     addSession,
     completeSession,
-    scheduledWorkouts,
-    addScheduledWorkout,
-    updateScheduledWorkout,
-    deleteScheduledWorkout,
     userSettings,
     updateUserSettings,
   };

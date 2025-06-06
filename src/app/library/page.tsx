@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAppContext } from '@/contexts/AppContext';
 import type { Workout, Exercise } from '@/lib/types';
-import { PlusCircle, Trash2, Play, Eye, CalendarPlus, Target, Flame, Edit, Repeat } from 'lucide-react';
+import { PlusCircle, Trash2, Play, Eye, Target, Flame, Edit, Repeat, AlertTriangle, CalendarDays } from 'lucide-react';
 import Link from 'next/link';
 import {
   AlertDialog,
@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { format, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 export default function WorkoutLibraryPage() {
   const { workouts, deleteWorkout, addSession, getWorkoutById } = useAppContext();
@@ -60,10 +62,6 @@ export default function WorkoutLibraryPage() {
     router.push('/progress');
   };
   
-  const handleScheduleWorkout = (workout: Workout) => {
-    router.push(`/scheduler?workoutId=${workout.id}&workoutName=${encodeURIComponent(workout.name)}`);
-  };
-
   const handleEditWorkout = (workoutId: string) => {
     router.push(`/builder?editId=${workoutId}`);
   };
@@ -125,6 +123,11 @@ export default function WorkoutLibraryPage() {
                       <Repeat className="h-3 w-3 mr-1" /> Repetir a cada {workout.repeatFrequencyDays} dia(s)
                     </CardDescription>
                   )}
+                  {workout.deadline && (
+                    <CardDescription className="text-xs text-muted-foreground flex items-center mt-1">
+                      <CalendarDays className="h-3 w-3 mr-1 text-blue-500" /> Deadline: {format(parseISO(workout.deadline), "dd/MM/yyyy", { locale: ptBR })}
+                    </CardDescription>
+                  )}
                 </CardHeader>
                 <CardContent className="flex-grow">
                   <h4 className="font-medium mb-1 text-sm">Exercícios:</h4>
@@ -149,9 +152,6 @@ export default function WorkoutLibraryPage() {
                   </Button>
                   <Button variant="default" size="sm" onClick={() => handleStartWorkout(workout)}>
                     <Play className="mr-1 h-4 w-4" /> Iniciar
-                  </Button>
-                   <Button variant="secondary" size="sm" onClick={() => handleScheduleWorkout(workout)}>
-                    <CalendarPlus className="mr-1 h-4 w-4" /> Agendar
                   </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
@@ -192,6 +192,11 @@ export default function WorkoutLibraryPage() {
                {selectedWorkout.repeatFrequencyDays && (
                 <AlertDialogDescription className="text-xs text-muted-foreground flex items-center mt-1">
                   <Repeat className="h-3 w-3 mr-1" /> Repetir a cada {selectedWorkout.repeatFrequencyDays} dia(s) após conclusão.
+                </AlertDialogDescription>
+              )}
+              {selectedWorkout.deadline && (
+                <AlertDialogDescription className="text-xs text-muted-foreground flex items-center mt-1">
+                  <CalendarDays className="h-3 w-3 mr-1 text-blue-500" /> Deadline: {format(parseISO(selectedWorkout.deadline), "dd/MM/yyyy", { locale: ptBR })}
                 </AlertDialogDescription>
               )}
             </AlertDialogHeader>

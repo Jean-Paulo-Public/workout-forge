@@ -13,8 +13,7 @@ import {
   PlusSquare,
   LibraryBig,
   BarChart3,
-  CalendarClock,
-  Dumbbell, // Ícone para Esteira de Treinos
+  Dumbbell, 
 } from 'lucide-react';
 
 const navItems = [
@@ -23,7 +22,6 @@ const navItems = [
   { href: '/library', label: 'Treinos', icon: LibraryBig },
   { href: '/builder', label: 'Construtor de Treinos', icon: PlusSquare },
   { href: '/progress', label: 'Acompanhamento', icon: BarChart3 },
-  { href: '/scheduler', label: 'Agendador', icon: CalendarClock },
 ];
 
 export function Navigation() {
@@ -35,7 +33,7 @@ export function Navigation() {
         <SidebarMenuItem key={item.href}>
           <SidebarMenuButton
             asChild
-            isActive={pathname === item.href || (item.href === "/dashboard" && pathname === "/")} // Mantém a lógica para /dashboard
+            isActive={pathname === item.href || (item.href === "/dashboard" && pathname === "/")} 
             tooltip={{ children: item.label, side: 'right', align: 'center' }}
           >
             <Link href={item.href}>

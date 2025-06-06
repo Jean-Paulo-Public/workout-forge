@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Trash2, Save, Target, BookOpenCheck } from 'lucide-react';
+import { PlusCircle, Trash2, Save, Target, BookOpenCheck, CalendarIcon, CalendarDays } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import type { Exercise, ModelExercise, Workout } from '@/lib/types';
@@ -23,24 +23,25 @@ import { ModelExerciseCategoryModal } from '@/components/ModelExerciseCategoryMo
 import { ModelExerciseSelectionModal } from '@/components/ModelExerciseSelectionModal';
 import { modelExerciseData } from '@/lib/model-exercises';
 import { muscleGroupSuggestedFrequencies } from '@/lib/muscle-group-frequencies';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
-// Schema base para um exercício, permitindo campos opcionais inicialmente.
 const baseExerciseSchema = z.object({
   id: z.string().optional(),
-  name: z.string(), // Nome inicialmente pode ser string vazia
-  sets: z.coerce.number().optional(), // Séries são opcionais na base, validadas condicionalmente
-  reps: z.string().optional(), // Reps são opcionais na base, validadas condicionalmente
+  name: z.string(), 
+  sets: z.coerce.number().optional(), 
+  reps: z.string().optional(), 
   weight: z.string().optional(),
   muscleGroups: z.array(z.string()).optional(),
   notes: z.string().optional(),
   hasWarmup: z.boolean().optional(),
 });
 
-// Schema refinado para um exercício.
-// Se o nome do exercício for preenchido, então nome (comprimento), séries e repetições se tornam obrigatórios.
 const exerciseSchema = baseExerciseSchema.superRefine((data, ctx) => {
-  if (data.name.trim() !== '') { // Se o nome do exercício estiver preenchido
-    // Validar comprimento do nome
+  if (data.name.trim() !== '') { 
     if (data.name.trim().length < 2) {
       ctx.addIssue({
         code: z.ZodIssueCode.too_small,
@@ -52,19 +53,16 @@ const exerciseSchema = baseExerciseSchema.superRefine((data, ctx) => {
       });
     }
 
-    // Validar séries
     if (data.sets === undefined || data.sets === null) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "As séries são obrigatórias.", path: ['sets'] });
     } else if (typeof data.sets === 'number' && isNaN(data.sets)) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "As séries devem ser um número válido.", path: ['sets'] });
     } else if (typeof data.sets === 'number' && data.sets < 1) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "As séries devem ser pelo menos 1.", path: ['sets'] });
-    } else if (typeof data.sets !== 'number') { // Fallback, should be caught by coerce.number if input was not numeric string
+    } else if (typeof data.sets !== 'number') { 
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Formato inválido para séries.", path: ['sets']});
     }
 
-
-    // Validar repetições
     if (data.reps === undefined || data.reps === null || data.reps.trim() === '') {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -73,8 +71,6 @@ const exerciseSchema = baseExerciseSchema.superRefine((data, ctx) => {
       });
     }
   }
-  // Se data.name.trim() === '', nenhuma issue é adicionada aqui, o exercício "vazio" passa nesta validação individual.
-  // Será filtrado posteriormente no schema do array de exercícios.
 });
 
 
@@ -83,17 +79,15 @@ const workoutFormSchema = z.object({
   description: z.string().optional(),
   exercises: z.array(exerciseSchema)
     .transform(exercises => {
-      // Filtra exercícios onde o nome não foi preenchido.
-      // Esses exercícios "vazios" passaram pelo `exerciseSchema` porque os campos condicionais não foram validados.
       return exercises.filter(ex => ex.name.trim() !== '');
     })
     .refine(filteredExercises => {
-      // Após filtrar, garante que pelo menos um exercício preenchido permaneça.
       return filteredExercises.length > 0;
     }, {
       message: "Adicione pelo menos um exercício preenchido.",
     }),
   repeatFrequencyDays: z.coerce.number().positive("A frequência deve ser um número positivo.").optional().or(z.literal('')),
+  deadline: z.date().optional(),
 });
 
 type WorkoutFormData = z.infer<typeof workoutFormSchema>;
@@ -121,21 +115,21 @@ export default function WorkoutBuilderPage() {
       description: '',
       exercises: [],
       repeatFrequencyDays: undefined,
+      deadline: undefined,
     },
   });
 
-  const { fields, append, remove, update } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: 'exercises',
   });
 
   const updateWorkoutFrequencyBasedOnExercises = useCallback((currentExercises: z.infer<typeof baseExerciseSchema>[] = []) => {
     let maxSuggestedFrequency = 0;
-    // Use `getValues` para obter os dados brutos do formulário, pois `currentExercises` pode ser antes da transformação/validação completa
     const exercisesToEvaluate = currentExercises.length > 0 ? currentExercises : form.getValues('exercises');
     
     exercisesToEvaluate.forEach(exercise => {
-      if (exercise.name.trim() !== '' && exercise.muscleGroups && exercise.muscleGroups.length > 0) { // Considerar apenas exercícios preenchidos
+      if (exercise.name.trim() !== '' && exercise.muscleGroups && exercise.muscleGroups.length > 0) {
         exercise.muscleGroups.forEach(group => {
           if (muscleGroupSuggestedFrequencies[group] && muscleGroupSuggestedFrequencies[group] > maxSuggestedFrequency) {
             maxSuggestedFrequency = muscleGroupSuggestedFrequencies[group];
@@ -146,7 +140,7 @@ export default function WorkoutBuilderPage() {
 
     if (maxSuggestedFrequency > 0) {
       const currentFrequencyField = form.getValues('repeatFrequencyDays');
-      const currentFrequency = currentFrequencyField === '' ? 0 : Number(currentFrequencyField); // Tratar '' como 0 para comparação
+      const currentFrequency = currentFrequencyField === '' ? 0 : Number(currentFrequencyField); 
 
       if (currentFrequency === 0 || currentFrequency < maxSuggestedFrequency) {
          form.setValue('repeatFrequencyDays', maxSuggestedFrequency);
@@ -158,7 +152,6 @@ export default function WorkoutBuilderPage() {
     if (editingWorkoutId) {
       const workoutToEdit = getWorkoutById(editingWorkoutId);
       if (workoutToEdit) {
-        // Mapeia para o tipo esperado pelo formulário (baseExerciseSchema)
         const formExercises = workoutToEdit.exercises.map(ex => ({
             id: ex.id || generateId(),
             name: ex.name,
@@ -175,6 +168,7 @@ export default function WorkoutBuilderPage() {
           description: workoutToEdit.description || '',
           exercises: formExercises,
           repeatFrequencyDays: workoutToEdit.repeatFrequencyDays || undefined,
+          deadline: workoutToEdit.deadline ? parseISO(workoutToEdit.deadline) : undefined,
         });
         
         if (formExercises.length > 0) {
@@ -185,7 +179,6 @@ export default function WorkoutBuilderPage() {
         router.push('/library');
       }
     } else {
-      // Se não estiver editando e não houver exercícios, adicione um padrão
       if (form.getValues('exercises').length === 0) {
         append({ 
           id: generateId(),
@@ -215,9 +208,8 @@ export default function WorkoutBuilderPage() {
     };
     append(newExerciseData);
     
-    // Para cálculo da frequência, considera os exercícios já existentes mais o novo
-    const currentExercises = [...form.getValues('exercises')]; // Isso pega os valores atuais do RHF
-    updateWorkoutFrequencyBasedOnExercises(currentExercises); // RHF já terá o novo exercício na lista
+    const currentExercises = [...form.getValues('exercises')]; 
+    updateWorkoutFrequencyBasedOnExercises(currentExercises); 
   };
 
   const handleOpenMuscleGroupModal = (index: number) => {
@@ -261,23 +253,22 @@ export default function WorkoutBuilderPage() {
 
   async function onSubmit(values: WorkoutFormData) {
     setIsSaving(true);
-    // values.exercises já estarão filtrados aqui pelo `transform` do Zod schema.
-    // E os `sets` de cada exercício em `values.exercises` já serão números devido ao `z.coerce.number()`.
     const workoutData: Workout = {
       id: editingWorkoutId || generateId(),
       name: values.name,
       description: values.description,
       exercises: values.exercises.map(ex => ({ 
         id: ex.id || generateId(), 
-        name: ex.name, // Já sabemos que name.trim() !== ''
-        sets: ex.sets as number, // `sets` é number aqui por causa do coerce e validação
-        reps: ex.reps as string, // `reps` é string, validado como não vazio
+        name: ex.name, 
+        sets: ex.sets as number, 
+        reps: ex.reps as string, 
         weight: ex.weight || undefined,
         muscleGroups: ex.muscleGroups || [],
         notes: ex.notes || undefined,
         hasWarmup: ex.hasWarmup || false,
       })),
       repeatFrequencyDays: values.repeatFrequencyDays ? Number(values.repeatFrequencyDays) : undefined,
+      deadline: values.deadline ? values.deadline.toISOString() : undefined,
     };
 
     if (editingWorkoutId) {
@@ -294,16 +285,15 @@ export default function WorkoutBuilderPage() {
       });
     }
     
-    // Reset form to initial state which includes one empty exercise row if not editing
     form.reset({
       name: '',
       description: '',
-      exercises: [], // Clear exercises
+      exercises: [], 
       repeatFrequencyDays: undefined,
+      deadline: undefined,
     });
     
-    // After reset, add one default exercise row
-     if (!editingWorkoutId) { // Só adiciona o default se não estava editando (ou seja, novo treino)
+     if (!editingWorkoutId) { 
         append({ 
             id: generateId(),
             name: '', 
@@ -315,7 +305,6 @@ export default function WorkoutBuilderPage() {
             hasWarmup: false,
         });
     }
-
 
     setIsSaving(false);
     router.push('/library');
@@ -377,6 +366,49 @@ export default function WorkoutBuilderPage() {
                     </FormItem>
                   )}
                 />
+                 <FormField
+                  control={form.control}
+                  name="deadline"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Deadline (Data Limite) - Opcional</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {field.value ? (
+                                format(field.value, "PPP", { locale: ptBR })
+                              ) : (
+                                <span>Escolha uma data limite</span>
+                              )}
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() -1)) } // Permite selecionar hoje
+                            initialFocus
+                            locale={ptBR}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormDescription>
+                        Defina uma data limite para este treino aparecer destacado na esteira.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </CardContent>
             </Card>
 
@@ -387,7 +419,7 @@ export default function WorkoutBuilderPage() {
                  <FormField
                   control={form.control}
                   name="exercises"
-                  render={() => ( // Não precisa de field aqui, apenas para exibir a mensagem do array
+                  render={() => ( 
                     <FormItem>
                        <FormMessage />
                     </FormItem>
@@ -541,7 +573,7 @@ export default function WorkoutBuilderPage() {
           </form>
         </Form>
       </div>
-      {editingExerciseIndex !== null && form.getValues('exercises')?.[editingExerciseIndex] && ( // Adicionado verificação se o exercício existe
+      {editingExerciseIndex !== null && form.getValues('exercises')?.[editingExerciseIndex] && ( 
         <MuscleGroupSelectorModal
           isOpen={isMuscleGroupModalOpen}
           onClose={() => {
@@ -572,4 +604,3 @@ export default function WorkoutBuilderPage() {
     </AppLayout>
   );
 }
-

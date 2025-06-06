@@ -17,8 +17,8 @@ export interface Workout {
   name: string;
   description?: string;
   exercises: Exercise[];
-  repeatFrequencyDays?: number; // Novo campo para frequência de repetição
-  // Optional: category, lastPerformed (Date string), etc.
+  repeatFrequencyDays?: number; 
+  deadline?: string; // ISO Date string for deadline (opcional)
 }
 
 export interface WorkoutSession {
@@ -28,16 +28,6 @@ export interface WorkoutSession {
   date: string; // ISO Date string (start date)
   isCompleted: boolean;
   notes?: string;
-  // Optional: detailed performance log per exercise
-  // exercisesPerformed?: Array<Exercise & { actualSets?: number; actualReps?: string; actualWeight?: number | string }>;
-}
-
-export interface ScheduledWorkout {
-  id: string;
-  workoutId: string;
-  workoutName: string;
-  dateTime: string; // ISO DateTime string
-  // Optional: completed (boolean)
 }
 
 export interface UserSettings {
