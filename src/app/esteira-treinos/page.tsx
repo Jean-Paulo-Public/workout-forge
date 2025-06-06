@@ -22,6 +22,50 @@ interface WorkoutWithStatus extends Workout {
   isTodayDeadline?: boolean;
 }
 
+interface DeadlineDisplayInfo {
+  statusText: string;
+  cardClasses: string;
+  alertIcon?: JSX.Element;
+  deadlineTextColorClass: string;
+}
+
+function getDeadlineDisplayInfo(workout: WorkoutWithStatus): DeadlineDisplayInfo {
+  const baseCardClasses = "flex flex-col";
+  const baseDeadlineTextColor = "text-muted-foreground";
+  
+  let info: DeadlineDisplayInfo = {
+    statusText: "",
+    cardClasses: baseCardClasses,
+    alertIcon: undefined,
+    deadlineTextColorClass: baseDeadlineTextColor,
+  };
+
+  if (workout.deadline) {
+    if (workout.isOverdue) {
+      info.statusText = " (Vencido)";
+      info.cardClasses = cn(baseCardClasses, "border-red-500 ring-2 ring-red-500/50");
+      info.alertIcon = <AlertTriangle className="h-5 w-5 text-red-500" title="Deadline Vencido!" />;
+      info.deadlineTextColorClass = "text-red-600 font-medium";
+    } else if (workout.isTodayDeadline) {
+      info.statusText = " (Hoje!)";
+      info.cardClasses = cn(baseCardClasses, "border-orange-500 ring-2 ring-orange-500/50");
+      info.alertIcon = <AlertTriangle className="h-5 w-5 text-orange-500" title="Deadline Hoje!" />;
+      info.deadlineTextColorClass = "text-orange-600 font-medium";
+    } else if (workout.daysUntilDeadline === 1) {
+      info.statusText = " (Amanhã!)";
+      info.cardClasses = cn(baseCardClasses, "border-yellow-500 ring-2 ring-yellow-500/50");
+      info.alertIcon = <AlertTriangle className="h-5 w-5 text-yellow-500" title="Deadline Amanhã!" />;
+      info.deadlineTextColorClass = "text-yellow-600 font-medium";
+    } else if (workout.daysUntilDeadline !== undefined && workout.daysUntilDeadline > 1) {
+      info.statusText = ` (em ${workout.daysUntilDeadline} dias)`;
+      // No special card class or alert icon for future, non-imminent deadlines
+    }
+    // If none of the above, statusText remains "", and other props remain at their base/default
+  }
+  return info;
+}
+
+
 export default function TrainingMatPage() {
   const { workouts, sessions, addSession, getWorkoutById } = useAppContext();
   const router = useRouter();
@@ -34,25 +78,36 @@ export default function TrainingMatPage() {
     const availableWorkouts = workouts.filter(workout => {
       const completedSessionsForThisWorkout = sessions.filter(s => s.workoutId === workout.id && s.isCompleted);
 
-      if (workout.repeatFrequencyDays && workout.repeatFrequencyDays > 0 && completedSessionsForThisWorkout.length === 0) {
-        return true; // Available if has frequency and never done
+      // Rule 1: Available if has frequency or deadline, and never done
+      if ((workout.repeatFrequencyDays && workout.repeatFrequencyDays > 0) && completedSessionsForThisWorkout.length === 0) {
+        return true; 
       }
       if (workout.deadline && completedSessionsForThisWorkout.length === 0) {
-         return true; // Available if has deadline and never done
+         return true; 
       }
 
-
+      // Rule 2: If no frequency, only rely on deadline (covered by rule 1 if never done)
+      // If it has been done, and no frequency, it won't reappear unless deadline logic is added here.
+      // For now, if no frequency and done, it's not on the mat based on frequency.
       if (!workout.repeatFrequencyDays || workout.repeatFrequencyDays <= 0) {
-        return !!workout.deadline;
+        // This condition is a bit tricky. If it has a deadline and never done, Rule 1 catches it.
+        // If it has a deadline and HAS been done, but no frequency, should it appear?
+        // Current logic: no, frequency is primary for re-appearance.
+        // If deadline is the only trigger after completion, this needs adjustment.
+        // Let's assume for now, frequency is needed for re-appearance after first completion.
+        // If it was only deadline-driven and completed, it's "done".
+        return false; // if no frequency, it does not re-appear based on frequency.
       }
-
+      
+      // Rule 3: Has frequency and has been completed at least once
       const completedSessionsSorted = sessions
         .filter(s => s.workoutId === workout.id && s.isCompleted)
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-      if (completedSessionsSorted.length === 0) { // Has frequency but never done (already covered, but good for clarity)
-        return true;
-      }
+      
+      // This case should be covered by rule 1 (if never done and has frequency)
+      // if (completedSessionsSorted.length === 0) { 
+      //   return true;
+      // }
 
       const lastCompletionDate = startOfToday(parseISO(completedSessionsSorted[0].date));
       const nextAvailableDate = addDays(lastCompletionDate, workout.repeatFrequencyDays as number);
@@ -68,7 +123,7 @@ export default function TrainingMatPage() {
       if (workout.deadline) {
         const deadlineDate = startOfToday(parseISO(workout.deadline));
         isOverdue = isBefore(deadlineDate, today);
-        daysUntilDeadline = differenceInDays(deadlineDate, today); // dateLeft - dateRight
+        daysUntilDeadline = differenceInDays(deadlineDate, today); 
         isTodayDeadline = isToday(deadlineDate);
       }
       return { ...workout, isOverdue, daysUntilDeadline, isTodayDeadline };
@@ -79,13 +134,13 @@ export default function TrainingMatPage() {
       if (a.isOverdue && !b.isOverdue) return -1;
       if (!a.isOverdue && b.isOverdue) return 1;
       if (a.isOverdue && b.isOverdue) {
-        return (a.daysUntilDeadline ?? -Infinity) - (b.daysUntilDeadline ?? -Infinity); // more negative is older
+        return (a.daysUntilDeadline ?? -Infinity) - (b.daysUntilDeadline ?? -Infinity); 
       }
 
       // 2. Workouts with deadline today
       if (a.isTodayDeadline && !b.isTodayDeadline) return -1;
       if (!a.isTodayDeadline && b.isTodayDeadline) return 1;
-      if (a.isTodayDeadline && b.isTodayDeadline) { // If both today, sort by name
+      if (a.isTodayDeadline && b.isTodayDeadline) { 
         return a.name.localeCompare(b.name);
       }
 
@@ -94,7 +149,7 @@ export default function TrainingMatPage() {
       const bIsTomorrow = !b.isOverdue && !b.isTodayDeadline && b.daysUntilDeadline === 1;
       if (aIsTomorrow && !bIsTomorrow) return -1;
       if (!aIsTomorrow && bIsTomorrow) return 1;
-      if (aIsTomorrow && bIsTomorrow) { // If both tomorrow, sort by name
+      if (aIsTomorrow && bIsTomorrow) { 
          return a.name.localeCompare(b.name);
       }
       
@@ -167,69 +222,58 @@ export default function TrainingMatPage() {
           </Card>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {displayableWorkouts.map((workout) => (
-              <Card
-                key={workout.id}
-                className={cn("flex flex-col", {
-                  "border-red-500 ring-2 ring-red-500/50": workout.isOverdue,
-                  "border-orange-500 ring-2 ring-orange-500/50": !workout.isOverdue && workout.isTodayDeadline,
-                  "border-yellow-500 ring-2 ring-yellow-500/50": !workout.isOverdue && !workout.isTodayDeadline && workout.daysUntilDeadline === 1,
-                })}
-              >
-                <CardHeader>
-                  <CardTitle className="font-headline flex items-center justify-between">
-                    {workout.name}
-                    {workout.isOverdue && <AlertTriangle className="h-5 w-5 text-red-500" title="Deadline Vencido!" />}
-                    {!workout.isOverdue && workout.isTodayDeadline && <AlertTriangle className="h-5 w-5 text-orange-500" title="Deadline Hoje!" />}
-                    {!workout.isOverdue && !workout.isTodayDeadline && workout.daysUntilDeadline === 1 && <AlertTriangle className="h-5 w-5 text-yellow-500" title="Deadline Amanhã!" />}
-                  </CardTitle>
-                  {workout.description && (
-                    <CardDescription>{workout.description}</CardDescription>
-                  )}
-                  <div className="space-y-1">
-                    {workout.repeatFrequencyDays && (
-                      <CardDescription className="text-xs text-muted-foreground flex items-center">
-                        <Repeat className="h-3 w-3 mr-1" /> Repetir a cada {workout.repeatFrequencyDays} dia(s)
-                      </CardDescription>
+            {displayableWorkouts.map((workout) => {
+              const displayInfo = getDeadlineDisplayInfo(workout);
+              return (
+                <Card
+                  key={workout.id}
+                  className={displayInfo.cardClasses}
+                >
+                  <CardHeader>
+                    <CardTitle className="font-headline flex items-center justify-between">
+                      {workout.name}
+                      {displayInfo.alertIcon}
+                    </CardTitle>
+                    {workout.description && (
+                      <CardDescription>{workout.description}</CardDescription>
                     )}
-                    {workout.deadline && (
-                       <CardDescription className={cn("text-xs flex items-center",
-                         workout.isOverdue ? "text-red-600 font-medium" :
-                         (!workout.isOverdue && workout.isTodayDeadline ? "text-orange-600 font-medium" :
-                         (!workout.isOverdue && !workout.isTodayDeadline && workout.daysUntilDeadline === 1 ? "text-yellow-600 font-medium" : "text-muted-foreground"))
-                       )}>
-                         <CalendarDays className="h-3 w-3 mr-1" /> Deadline: {format(parseISO(workout.deadline), "dd/MM/yyyy", { locale: ptBR })}
-                         {workout.isOverdue ? " (Vencido)"
-                           : workout.isTodayDeadline ? " (Hoje!)"
-                           : workout.daysUntilDeadline === 1 ? " (Amanhã!)"
-                           : (workout.daysUntilDeadline !== undefined && workout.daysUntilDeadline > 1) ? ` (em ${workout.daysUntilDeadline} dias)`
-                           : (workout.daysUntilDeadline !== undefined && workout.daysUntilDeadline < 0) ? "" // Should be covered by isOverdue
-                           : ""}
-                       </CardDescription>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  <h4 className="font-medium mb-1 text-sm">Exercícios ({workout.exercises.length}):</h4>
-                  <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 max-h-24 overflow-y-auto">
-                    {workout.exercises.slice(0,2).map((exercise) => (
-                      <li key={exercise.id} className="truncate">
-                        {exercise.name}
-                      </li>
-                    ))}
-                    {workout.exercises.length > 2 && <li>...e mais {workout.exercises.length - 2}.</li>}
-                  </ul>
-                </CardContent>
-                <CardFooter className="flex flex-wrap gap-2 justify-end">
-                  <Button variant="default" size="sm" onClick={() => handleStartWorkout(workout)}>
-                    <Play className="mr-1 h-4 w-4" /> Iniciar Agora
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))}
+                    <div className="space-y-1">
+                      {workout.repeatFrequencyDays && (
+                        <CardDescription className="text-xs text-muted-foreground flex items-center">
+                          <Repeat className="h-3 w-3 mr-1" /> Repetir a cada {workout.repeatFrequencyDays} dia(s)
+                        </CardDescription>
+                      )}
+                      {workout.deadline && (
+                         <CardDescription className={cn("text-xs flex items-center", displayInfo.deadlineTextColorClass)}>
+                           <CalendarDays className="h-3 w-3 mr-1" /> Deadline: {format(parseISO(workout.deadline), "dd/MM/yyyy", { locale: ptBR })}
+                           {displayInfo.statusText}
+                         </CardDescription>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="flex-grow">
+                    <h4 className="font-medium mb-1 text-sm">Exercícios ({workout.exercises.length}):</h4>
+                    <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 max-h-24 overflow-y-auto">
+                      {workout.exercises.slice(0,2).map((exercise) => (
+                        <li key={exercise.id} className="truncate">
+                          {exercise.name}
+                        </li>
+                      ))}
+                      {workout.exercises.length > 2 && <li>...e mais {workout.exercises.length - 2}.</li>}
+                    </ul>
+                  </CardContent>
+                  <CardFooter className="flex flex-wrap gap-2 justify-end">
+                    <Button variant="default" size="sm" onClick={() => handleStartWorkout(workout)}>
+                      <Play className="mr-1 h-4 w-4" /> Iniciar Agora
+                    </Button>
+                  </CardFooter>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
     </AppLayout>
   );
 }
+
