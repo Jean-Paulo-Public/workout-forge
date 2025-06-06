@@ -7,7 +7,7 @@ export interface Exercise {
   weight?: string; // e.g., "50kg", "Peso Corporal", "Cardio" - This is the PLANNED/TARGET weight
   muscleGroups?: string[]; // e.g., ["Peito", "Tríceps"]
   notes?: string; // Campo opcional para observações
-  hasWarmup?: boolean; // Novo campo para série de aquecimento
+  hasWarmup?: boolean; // Indicates if this specific exercise has a warmup phase
   // Optional fields
   duration?: string; // e.g., "60s"
 }
@@ -25,8 +25,9 @@ export interface SessionExercisePerformance {
   exerciseId: string; // Corresponds to Exercise.id in the Workout
   exerciseName: string; // Denormalized for easier display
   plannedWeight?: string; // Weight from the workout plan
-  weightUsed?: string; // Actual weight used in this session
-  // Potentially add setsCompleted, repsCompleted in the future
+  weightUsed?: string; // Actual weight used in this session for this exercise
+  isWarmupCompleted?: boolean; // Tracks if the warmup for this specific exercise is done
+  isExerciseCompleted?: boolean; // Tracks if this specific exercise is done
 }
 
 export interface WorkoutSession {
@@ -34,10 +35,9 @@ export interface WorkoutSession {
   workoutId: string; // Reference to Workout.id
   workoutName: string; // Denormalized for easy display
   date: string; // ISO Date string (start date)
-  isCompleted: boolean;
+  isCompleted: boolean; // Overall session completion
   notes?: string;
-  warmupCompleted?: boolean; // Indica se a fase de aquecimento (se houver) foi concluída
-  exercisePerformances?: SessionExercisePerformance[]; // Tracks actual performance
+  exercisePerformances: SessionExercisePerformance[]; // Tracks actual performance for each exercise
 }
 
 export interface UserSettings {

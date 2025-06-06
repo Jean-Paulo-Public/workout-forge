@@ -2,7 +2,7 @@
 "use client";
 
 import type { ReactNode } from 'react';
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { Workout, WorkoutSession, UserSettings, Exercise, SessionExercisePerformance } from '@/lib/types';
 
 interface AppContextType {
@@ -13,10 +13,12 @@ interface AppContextType {
   getWorkoutById: (workoutId: string) => Workout | undefined;
 
   sessions: WorkoutSession[];
-  addSession: (session: Omit<WorkoutSession, 'id' | 'isCompleted' | 'warmupCompleted' | 'notes' | 'exercisePerformances'>) => void;
-  completeSession: (sessionId: string, performances: SessionExercisePerformance[]) => void;
-  markWarmupAsCompleted: (sessionId: string, firstExerciseName?: string) => void;
+  addSession: (sessionData: Pick<WorkoutSession, 'workoutId' | 'workoutName' | 'date'>) => void;
+  updateSessionExercisePerformance: (sessionId: string, exerciseId: string, updates: Partial<SessionExercisePerformance>) => void;
+  completeSession: (sessionId: string) => void;
   hasActiveSession: (workoutId: string) => boolean;
+  getLastUsedWeightForExercise: (workoutId: string, exerciseId: string) => string | undefined;
+
 
   userSettings: UserSettings;
   updateUserSettings: (settings: Partial<UserSettings>) => void;
@@ -71,7 +73,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       id: generateId(),
       exercises: workoutData.exercises.map(ex => ({
         ...ex,
-        id: ex.id || generateId(), // Ensure exercise has an ID
+        id: ex.id || generateId(),
         hasWarmup: ex.hasWarmup || false,
       })),
       repeatFrequencyDays: workoutData.repeatFrequencyDays || undefined,
@@ -107,69 +109,79 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return sessions.some(s => s.workoutId === workoutId && !s.isCompleted);
   };
 
-  const addSession = (sessionData: Omit<WorkoutSession, 'id' | 'isCompleted' | 'warmupCompleted' | 'notes' | 'exercisePerformances'>) => {
+  const addSession = (sessionData: Pick<WorkoutSession, 'workoutId' | 'workoutName' | 'date'>) => {
     const workout = getWorkoutById(sessionData.workoutId);
-    let sessionNotes = `Iniciou ${sessionData.workoutName}.`;
-    let initialWarmupCompleted = true;
-    let initialExercisePerformances: SessionExercisePerformance[] = [];
-
-    if (workout) {
-      initialExercisePerformances = workout.exercises.map(ex => ({
-        exerciseId: ex.id,
-        exerciseName: ex.name,
-        plannedWeight: ex.weight || "0", // Default to "0" if no planned weight
-        weightUsed: ex.weight || "0", // Pre-fill with planned weight, or "0"
-      }));
-
-      if (workout.exercises.length > 0 && workout.exercises[0].hasWarmup) {
-        sessionNotes = `Iniciando aquecimento para ${workout.exercises[0].name}. Treino: ${sessionData.workoutName}.`;
-        initialWarmupCompleted = false;
-      }
+    if (!workout) {
+      console.error("Workout not found for session:", sessionData.workoutId);
+      return;
     }
 
+    const initialExercisePerformances: SessionExercisePerformance[] = workout.exercises.map(ex => ({
+      exerciseId: ex.id,
+      exerciseName: ex.name,
+      plannedWeight: ex.weight || "0",
+      weightUsed: ex.weight || "0", // Initialize with planned, can be overwritten by "last used" in modal
+      isWarmupCompleted: false,
+      isExerciseCompleted: false,
+    }));
 
     const newSession: WorkoutSession = {
       ...sessionData,
       id: generateId(),
       isCompleted: false,
-      notes: sessionNotes,
-      warmupCompleted: initialWarmupCompleted,
+      notes: `Sessão de ${sessionData.workoutName} iniciada.`,
       exercisePerformances: initialExercisePerformances,
     };
     setSessions((prev) => [newSession, ...prev]);
   };
-
-  const markWarmupAsCompleted = (sessionId: string, firstExerciseName?: string) => {
-    setSessions(prev =>
-      prev.map(session => {
+  
+  const updateSessionExercisePerformance = useCallback((sessionId: string, exerciseId: string, updates: Partial<SessionExercisePerformance>) => {
+    setSessions(prevSessions =>
+      prevSessions.map(session => {
         if (session.id === sessionId) {
-          let updatedNotes = session.notes;
-          if (firstExerciseName) {
-            updatedNotes = `Aquecimento para ${firstExerciseName} concluído. Iniciando treino principal de ${session.workoutName}.`;
-          } else {
-            updatedNotes = `Aquecimento concluído. Iniciando treino principal de ${session.workoutName}.`;
-          }
-          return { ...session, warmupCompleted: true, notes: updatedNotes };
+          return {
+            ...session,
+            exercisePerformances: session.exercisePerformances.map(perf => {
+              if (perf.exerciseId === exerciseId) {
+                return { ...perf, ...updates };
+              }
+              return perf;
+            }),
+          };
         }
         return session;
       })
     );
-  };
+  }, []);
 
-  const completeSession = (sessionId: string, performances: SessionExercisePerformance[]) => {
+  const completeSession = (sessionId: string) => {
     setSessions(prev =>
       prev.map(session =>
         session.id === sessionId
           ? {
               ...session,
               isCompleted: true,
-              notes: `${session.notes || ''} Treino finalizado. Pesos registrados.`,
-              exercisePerformances: performances,
+              notes: `${session.notes || ''} Treino finalizado e performance registrada.`,
             }
           : session
       )
     );
   };
+  
+  const getLastUsedWeightForExercise = useCallback((workoutId: string, exerciseId: string): string | undefined => {
+    const relevantSessions = sessions
+      .filter(s => s.workoutId === workoutId && s.isCompleted)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    for (const session of relevantSessions) {
+      const performance = session.exercisePerformances.find(p => p.exerciseId === exerciseId);
+      if (performance && performance.weightUsed !== undefined) {
+        return performance.weightUsed;
+      }
+    }
+    return undefined;
+  }, [sessions]);
+
 
   const updateUserSettings = (newSettings: Partial<UserSettings>) => {
     setUserSettingsState(prev => ({ ...prev, ...newSettings }));
@@ -183,9 +195,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     getWorkoutById,
     sessions,
     addSession,
+    updateSessionExercisePerformance,
     completeSession,
-    markWarmupAsCompleted,
     hasActiveSession,
+    getLastUsedWeightForExercise,
     userSettings,
     updateUserSettings,
   };

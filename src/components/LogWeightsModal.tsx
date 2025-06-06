@@ -1,6 +1,9 @@
 
 "use client";
 
+// This component is no longer used and can be deleted.
+// Its functionality has been superseded by TrackWorkoutModal.tsx.
+
 import { useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -17,7 +20,7 @@ const performanceSchema = z.object({
   exerciseId: z.string(),
   exerciseName: z.string(),
   plannedWeight: z.string().optional(),
-  weightUsed: z.string().optional().default("0"), // Default to "0" if not provided
+  weightUsed: z.string().optional().default("0"), 
 });
 
 const logWeightsFormSchema = z.object({
@@ -29,8 +32,8 @@ type LogWeightsFormData = z.infer<typeof logWeightsFormSchema>;
 interface LogWeightsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  workout: Workout | undefined; // Workout from which exercises are listed
-  session: WorkoutSession | undefined; // Session being completed
+  workout: Workout | undefined; 
+  session: WorkoutSession | undefined; 
   onSave: (performances: SessionExercisePerformance[]) => void;
 }
 
@@ -50,7 +53,6 @@ export function LogWeightsModal({ isOpen, onClose, workout, session, onSave }: L
   useEffect(() => {
     if (isOpen && workout && session) {
       const initialPerformances = workout.exercises.map(exercise => {
-        // Find if this exercise already has performance data in the current session (e.g. if modal was opened, closed, reopened)
         const existingPerf = session.exercisePerformances?.find(p => p.exerciseId === exercise.id);
         return {
           exerciseId: exercise.id,
@@ -68,7 +70,7 @@ export function LogWeightsModal({ isOpen, onClose, workout, session, onSave }: L
         exerciseId: p.exerciseId,
         exerciseName: p.exerciseName,
         plannedWeight: p.plannedWeight,
-        weightUsed: p.weightUsed || "0", // Ensure weightUsed is always a string
+        weightUsed: p.weightUsed || "0", 
     })));
     onClose();
   };
@@ -90,7 +92,7 @@ export function LogWeightsModal({ isOpen, onClose, workout, session, onSave }: L
             <ScrollArea className="h-[50vh] my-4 pr-3">
               <div className="space-y-4">
                 {fields.map((item, index) => (
-                  <Card key={item.id} className="p-4"> {/* Using Card for better visual separation */}
+                  <Card key={item.id} className="p-4">
                     <FormField
                       control={form.control}
                       name={`performances.${index}.weightUsed`}
@@ -128,7 +130,6 @@ export function LogWeightsModal({ isOpen, onClose, workout, session, onSave }: L
   );
 }
 
-// Simple Card component to avoid full import if Card isn't available globally yet
 const Card = ({ className, children }: { className?: string, children: React.ReactNode }) => (
   <div className={`border rounded-md ${className}`}>
     {children}

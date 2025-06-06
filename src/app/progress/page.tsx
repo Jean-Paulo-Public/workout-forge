@@ -4,16 +4,16 @@
 import { AppLayout } from '@/components/layout/app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { BarChart3, History, TrendingUp, CheckCircle2, Flame } from 'lucide-react';
+import { BarChart3, History, TrendingUp, CheckCircle2, PlayCircle } from 'lucide-react'; // Changed Flame to PlayCircle
 import { useAppContext } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import type { Workout, WorkoutSession, SessionExercisePerformance } from '@/lib/types';
 import { DeadlineUpdateModal } from '@/components/DeadlineUpdateModal';
-import { LogWeightsModal } from '@/components/LogWeightsModal';
+import { TrackWorkoutModal } from '@/components/TrackWorkoutModal'; // New Modal
 
 const PlaceholderChart = () => (
   <div className="w-full h-64 bg-muted rounded-md flex items-center justify-center">
@@ -23,48 +23,40 @@ const PlaceholderChart = () => (
 );
 
 export default function ProgressTrackingPage() {
-  const { sessions, getWorkoutById, updateWorkout, completeSession, markWarmupAsCompleted } = useAppContext();
+  const { sessions, getWorkoutById, updateWorkout } = useAppContext(); // Removed completeSession, markWarmupAsCompleted
   const { toast } = useToast();
   const [workoutToUpdateDeadline, setWorkoutToUpdateDeadline] = useState<Workout | null>(null);
-  const [sessionToLogWeights, setSessionToLogWeights] = useState<WorkoutSession | null>(null);
-  const [isLogWeightsModalOpen, setIsLogWeightsModalOpen] = useState(false);
+  
+  // State for the new TrackWorkoutModal
+  const [trackingSession, setTrackingSession] = useState<WorkoutSession | null>(null);
+  const [isTrackModalOpen, setIsTrackModalOpen] = useState(false);
 
-  // Get the workout associated with the session we want to log weights for
-  const workoutForModal = sessionToLogWeights ? getWorkoutById(sessionToLogWeights.workoutId) : undefined;
+  // Get the workout associated with the session we want to track
+  const workoutForTrackingModal = trackingSession ? getWorkoutById(trackingSession.workoutId) : undefined;
 
   const sortedSessions = [...sessions].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  const openLogWeightsModal = (session: WorkoutSession) => {
-    setSessionToLogWeights(session);
-    setIsLogWeightsModalOpen(true);
+  const openTrackWorkoutModal = (session: WorkoutSession) => {
+    setTrackingSession(session);
+    setIsTrackModalOpen(true);
   };
 
-  const handleSaveWeightsAndComplete = (performances: SessionExercisePerformance[]) => {
-    if (sessionToLogWeights) {
-      completeSession(sessionToLogWeights.id, performances);
-      toast({
-        title: "Treino Finalizado e Pesos Salvos!",
-        description: `A sessão de ${sessionToLogWeights.workoutName} foi marcada como concluída.`,
-      });
-
-      const workout = getWorkoutById(sessionToLogWeights.workoutId);
-      if (workout && workout.repeatFrequencyDays && workout.repeatFrequencyDays > 0) {
-        setWorkoutToUpdateDeadline(workout);
-      }
+  const handleWorkoutFinallyCompleted = useCallback(() => {
+    // This function is called from TrackWorkoutModal AFTER completeSession in context is called.
+    // Now, we check if we need to show the deadline update modal.
+    if (trackingSession) {
+        const workout = getWorkoutById(trackingSession.workoutId);
+        if (workout && workout.repeatFrequencyDays && workout.repeatFrequencyDays > 0) {
+            setWorkoutToUpdateDeadline(workout); // This will open the DeadlineUpdateModal
+        }
+        toast({
+            title: "Treino Finalizado!",
+            description: `A sessão de ${trackingSession.workoutName} foi marcada como concluída e sua performance registrada.`,
+        });
     }
-    setIsLogWeightsModalOpen(false);
-    setSessionToLogWeights(null);
-  };
+    setTrackingSession(null); // Clear the session being tracked as it's now complete
+  }, [trackingSession, getWorkoutById, toast]);
 
-  const handleMarkWarmupCompleted = (sessionId: string, workoutId: string) => {
-    const workout = getWorkoutById(workoutId);
-    const firstExerciseName = workout?.exercises[0]?.name;
-    markWarmupAsCompleted(sessionId, firstExerciseName);
-    toast({
-      title: "Aquecimento Concluído!",
-      description: `Aquecimento para ${firstExerciseName || 'o treino'} finalizado. Continue com o treino principal!`,
-    });
-  };
 
   const handleDeadlineSave = (updatedWorkoutId: string, newDeadline?: Date) => {
     const workoutToUpdate = getWorkoutById(updatedWorkoutId);
@@ -103,7 +95,7 @@ export default function ProgressTrackingPage() {
                 <History className="text-primary" />
                 Histórico de Treinos
               </CardTitle>
-              <CardDescription>Revise suas sessões de treino. Registre os pesos e marque as sessões como finalizadas.</CardDescription>
+              <CardDescription>Revise suas sessões de treino. Acompanhe e finalize os treinos.</CardDescription>
             </CardHeader>
             <CardContent>
               {sortedSessions.length === 0 ? (
@@ -112,12 +104,8 @@ export default function ProgressTrackingPage() {
                 <ScrollArea className="h-72">
                   <ul className="space-y-3">
                     {sortedSessions.map(session => {
-                      const workoutDetails = getWorkoutById(session.workoutId);
-                      const firstExerciseHasWarmup = workoutDetails?.exercises[0]?.hasWarmup === true;
-                      const isWarmupPhaseActive = firstExerciseHasWarmup && !session.warmupCompleted;
-
                       return (
-                      <li key={session.id} className="p-3 border rounded-md bg-background hover:bg-secondary/50 transition-colors">
+                      <li key={session.id} className="p-3 border rounded-md bg-card hover:bg-muted/10 transition-colors">
                         <div className="flex justify-between items-start">
                           <div>
                             <p className="font-semibold">{session.workoutName}</p>
@@ -127,25 +115,14 @@ export default function ProgressTrackingPage() {
                             {session.notes && <p className="text-xs italic mt-1 text-muted-foreground">{session.notes}</p>}
                           </div>
                           {!session.isCompleted ? (
-                            isWarmupPhaseActive ? (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleMarkWarmupCompleted(session.id, session.workoutId)}
-                                className="whitespace-nowrap"
-                              >
-                                <Flame className="mr-2 h-4 w-4 text-orange-500" /> Concluir Aquecimento
-                              </Button>
-                            ) : (
-                              <Button
-                                size="sm"
-                                variant="default"
-                                onClick={() => openLogWeightsModal(session)}
-                                className="whitespace-nowrap"
-                              >
-                                <CheckCircle2 className="mr-2 h-4 w-4 text-primary-foreground" /> Finalizar Treino
-                              </Button>
-                            )
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => openTrackWorkoutModal(session)}
+                              className="whitespace-nowrap"
+                            >
+                              <PlayCircle className="mr-2 h-4 w-4 text-primary-foreground" /> Acompanhar Treino
+                            </Button>
                           ) : (
                             <span className="text-xs text-green-600 font-medium flex items-center">
                               <CheckCircle2 className="mr-1 h-4 w-4" /> Concluído
@@ -153,11 +130,15 @@ export default function ProgressTrackingPage() {
                           )}
                         </div>
                         {session.isCompleted && session.exercisePerformances && session.exercisePerformances.length > 0 && (
-                          <div className="mt-2 pt-2 border-t border-muted/50">
-                            <h4 className="text-xs font-semibold mb-1">Pesos Utilizados:</h4>
+                          <div className="mt-2 pt-2 border-t">
+                            <h4 className="text-xs font-semibold mb-1">Performance Registrada:</h4>
                             <ul className="list-disc list-inside text-xs text-muted-foreground space-y-0.5">
                               {session.exercisePerformances.map(perf => (
-                                <li key={perf.exerciseId}>{perf.exerciseName}: {perf.weightUsed || 'N/A'}</li>
+                                <li key={perf.exerciseId}>
+                                  {perf.exerciseName}: {perf.weightUsed || 'N/A'}
+                                  {perf.isWarmupCompleted && workoutForTrackingModal?.exercises.find(e=>e.id === perf.exerciseId)?.hasWarmup ? ' (Aquec. ✓)' : ''}
+                                  {perf.isExerciseCompleted ? ' (Ex. ✓)' : ''}
+                                </li>
                               ))}
                             </ul>
                           </div>
@@ -190,16 +171,16 @@ export default function ProgressTrackingPage() {
           onSave={handleDeadlineSave}
         />
       )}
-      {isLogWeightsModalOpen && sessionToLogWeights && workoutForModal && (
-        <LogWeightsModal
-          isOpen={isLogWeightsModalOpen}
+      {isTrackModalOpen && trackingSession && workoutForTrackingModal && (
+        <TrackWorkoutModal
+          isOpen={isTrackModalOpen}
           onClose={() => {
-            setIsLogWeightsModalOpen(false);
-            setSessionToLogWeights(null);
+            setIsTrackModalOpen(false);
+            // setTrackingSession(null); // Don't nullify here, might be needed if modal is reopened before completion
           }}
-          workout={workoutForModal}
-          session={sessionToLogWeights}
-          onSave={handleSaveWeightsAndComplete}
+          session={trackingSession}
+          workout={workoutForTrackingModal}
+          onWorkoutFinallyCompleted={handleWorkoutFinallyCompleted}
         />
       )}
     </AppLayout>
