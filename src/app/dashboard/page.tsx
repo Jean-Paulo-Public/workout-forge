@@ -15,6 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import type { UserSettings } from '@/lib/types';
+import { useEffect } from 'react'; // Importação adicionada
 
 const userSettingsSchema = z.object({
   defaultSets: z.coerce.number().min(1, "Séries devem ser pelo menos 1."),
