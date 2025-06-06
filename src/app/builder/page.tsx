@@ -496,7 +496,7 @@ export default function WorkoutBuilderPage() {
                       )}
                     />
 
-                    {fields.length > 0 && ( // Condição para mostrar o botão de remover, antes era >1
+                    {fields.length > 0 && ( 
                        <Button
                         type="button"
                         variant="destructive"
