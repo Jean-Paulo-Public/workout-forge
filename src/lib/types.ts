@@ -4,6 +4,7 @@ export interface Exercise {
   sets: number;
   reps: string; // e.g., "10-12", "AMRAP", "30s"
   weight?: string; // e.g., "50kg", "Peso Corporal", "Cardio"
+  muscleGroups?: string[]; // e.g., ["Peito", "Tríceps"]
   // Optional fields
   duration?: string; // e.g., "60s"
   notes?: string;

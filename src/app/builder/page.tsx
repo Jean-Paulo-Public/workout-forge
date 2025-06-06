@@ -10,17 +10,19 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { PlusCircle, Trash2, Save } from 'lucide-react';
+import { PlusCircle, Trash2, Save, Target } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import type { Exercise } from '@/lib/types';
 import { useRouter } from 'next/navigation';
+import { MuscleGroupSelectorModal } from '@/components/MuscleGroupSelectorModal';
 
 const exerciseSchema = z.object({
   name: z.string().min(2, "O nome do exercício é muito curto."),
   sets: z.coerce.number().min(1, "As séries devem ser pelo menos 1."),
   reps: z.string().min(1, "As repetições são obrigatórias."),
   weight: z.string().optional(),
+  muscleGroups: z.array(z.string()).optional(),
 });
 
 const workoutFormSchema = z.object({
@@ -38,6 +40,8 @@ export default function WorkoutBuilderPage() {
   const { toast } = useToast();
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingExerciseIndex, setEditingExerciseIndex] = useState<number | null>(null);
 
   const form = useForm<WorkoutFormData>({
     resolver: zodResolver(workoutFormSchema),
@@ -48,7 +52,8 @@ export default function WorkoutBuilderPage() {
         name: '', 
         sets: userSettings.defaultSets, 
         reps: userSettings.defaultReps,
-        weight: '' 
+        weight: '',
+        muscleGroups: [],
       }],
     },
   });
@@ -58,18 +63,30 @@ export default function WorkoutBuilderPage() {
     name: 'exercises',
   });
   
-  // Update default exercise values if userSettings change
   useEffect(() => {
     if (fields.length === 0) {
        append({ 
         name: '', 
         sets: userSettings.defaultSets, 
         reps: userSettings.defaultReps,
-        weight: '' 
+        weight: '',
+        muscleGroups: [],
       });
     }
   }, [userSettings, fields.length, append]);
 
+  const handleOpenModal = (index: number) => {
+    setEditingExerciseIndex(index);
+    setIsModalOpen(true);
+  };
+
+  const handleSaveMuscleGroups = (groups: string[]) => {
+    if (editingExerciseIndex !== null) {
+      form.setValue(`exercises.${editingExerciseIndex}.muscleGroups`, groups);
+    }
+    setIsModalOpen(false);
+    setEditingExerciseIndex(null);
+  };
 
   async function onSubmit(values: WorkoutFormData) {
     setIsSaving(true);
@@ -79,7 +96,8 @@ export default function WorkoutBuilderPage() {
       exercises: values.exercises.map(ex => ({ 
         ...ex, 
         id: generateId(),
-        weight: ex.weight || undefined // Ensure empty string becomes undefined
+        weight: ex.weight || undefined,
+        muscleGroups: ex.muscleGroups || [],
       } as Exercise)),
     };
     addWorkout(newWorkout);
@@ -94,7 +112,8 @@ export default function WorkoutBuilderPage() {
         name: '', 
         sets: userSettings.defaultSets, 
         reps: userSettings.defaultReps,
-        weight: '' 
+        weight: '',
+        muscleGroups: [],
       }],
     });
     setIsSaving(false);
@@ -204,6 +223,17 @@ export default function WorkoutBuilderPage() {
                         )}
                       />
                     </div>
+                    
+                    <Button type="button" variant="outline" size="sm" onClick={() => handleOpenModal(index)}>
+                      <Target className="mr-2 h-4 w-4" /> Selecionar Grupos Musculares
+                    </Button>
+
+                    {form.watch(`exercises.${index}.muscleGroups`) && form.watch(`exercises.${index}.muscleGroups`)!.length > 0 && (
+                      <div className="text-sm text-muted-foreground">
+                        <strong>Grupos Musculares:</strong> {form.watch(`exercises.${index}.muscleGroups`)!.join(', ')}
+                      </div>
+                    )}
+
                     {fields.length > 1 && (
                        <Button
                         type="button"
@@ -225,7 +255,8 @@ export default function WorkoutBuilderPage() {
                     name: '', 
                     sets: userSettings.defaultSets, 
                     reps: userSettings.defaultReps, 
-                    weight: '' 
+                    weight: '',
+                    muscleGroups: [] 
                   })}
                 >
                   <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Exercício
@@ -240,6 +271,17 @@ export default function WorkoutBuilderPage() {
           </form>
         </Form>
       </div>
+      {editingExerciseIndex !== null && (
+        <MuscleGroupSelectorModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setEditingExerciseIndex(null);
+          }}
+          initialSelectedGroups={form.getValues(`exercises.${editingExerciseIndex}.muscleGroups`) || []}
+          onSave={handleSaveMuscleGroups}
+        />
+      )}
     </AppLayout>
   );
 }

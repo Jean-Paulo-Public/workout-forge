@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAppContext } from '@/contexts/AppContext';
 import type { Workout, Exercise } from '@/lib/types';
-import { PlusCircle, Trash2, Play, Eye, CalendarPlus } from 'lucide-react';
+import { PlusCircle, Trash2, Play, Eye, CalendarPlus, Target } from 'lucide-react';
 import Link from 'next/link';
 import {
   AlertDialog,
@@ -59,6 +59,9 @@ export default function WorkoutLibraryPage() {
     if (exercise.weight) {
       display += ` - Peso: ${exercise.weight}`;
     }
+    if (exercise.muscleGroups && exercise.muscleGroups.length > 0) {
+      display += ` (Músculos: ${exercise.muscleGroups.join(', ')})`;
+    }
     return display;
   };
 
@@ -101,10 +104,14 @@ export default function WorkoutLibraryPage() {
                 <CardContent className="flex-grow">
                   <h4 className="font-medium mb-1 text-sm">Exercícios:</h4>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 max-h-32 overflow-y-auto">
-                    {workout.exercises.slice(0,5).map((exercise) => (
-                      <li key={exercise.id}>{formatExerciseDisplay(exercise)}</li>
+                    {workout.exercises.slice(0,3).map((exercise) => ( // Show fewer exercises in card summary
+                      <li key={exercise.id} className="truncate" title={formatExerciseDisplay(exercise)}>
+                        {exercise.name} ({exercise.sets}x{exercise.reps})
+                        {exercise.muscleGroups && exercise.muscleGroups.length > 0 && 
+                          <span className="text-xs ml-1">({exercise.muscleGroups.slice(0,2).join(', ')}{exercise.muscleGroups.length > 2 ? '...' : ''})</span>}
+                      </li>
                     ))}
-                    {workout.exercises.length > 5 && <li>...e mais {workout.exercises.length - 5}</li>}
+                    {workout.exercises.length > 3 && <li>...e mais {workout.exercises.length - 3}</li>}
                   </ul>
                 </CardContent>
                 <CardFooter className="flex flex-wrap gap-2 justify-end">
@@ -161,6 +168,12 @@ export default function WorkoutLibraryPage() {
                   <p className="font-medium">{idx + 1}. {ex.name}</p>
                   <p className="text-muted-foreground">Séries: {ex.sets}, Reps: {ex.reps}</p>
                   {ex.weight && <p className="text-xs text-muted-foreground">Peso: {ex.weight}</p>}
+                  {ex.muscleGroups && ex.muscleGroups.length > 0 && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                      <Target className="h-3 w-3" /> 
+                      {ex.muscleGroups.join(', ')}
+                    </p>
+                  )}
                   {ex.notes && <p className="text-xs text-muted-foreground italic">Notas: {ex.notes}</p>}
                 </div>
               ))}
@@ -180,3 +193,4 @@ export default function WorkoutLibraryPage() {
     </AppLayout>
   );
 }
+
