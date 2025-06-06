@@ -1,13 +1,12 @@
+
 "use client";
 
 import { AppLayout } from '@/components/layout/app-layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { CalendarClock, LibraryBig, TrendingUp, Settings, Save } from 'lucide-react';
+import { LibraryBig, TrendingUp, Settings, Save } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -15,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import type { UserSettings } from '@/lib/types';
-import { useEffect } from 'react'; // Importação adicionada
+import { useEffect } from 'react';
 
 const userSettingsSchema = z.object({
   defaultSets: z.coerce.number().min(1, "Séries devem ser pelo menos 1."),
@@ -25,12 +24,8 @@ const userSettingsSchema = z.object({
 type UserSettingsFormData = z.infer<typeof userSettingsSchema>;
 
 export default function DashboardPage() {
-  const { scheduledWorkouts, workouts, sessions, userSettings, updateUserSettings } = useAppContext();
+  const { workouts, sessions, userSettings, updateUserSettings } = useAppContext();
   const { toast } = useToast();
-
-  const upcomingWorkout = scheduledWorkouts
-    .filter(sw => new Date(sw.dateTime) >= new Date())
-    .sort((a,b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime())[0];
 
   const settingsForm = useForm<UserSettingsFormData>({
     resolver: zodResolver(userSettingsSchema),
@@ -48,7 +43,6 @@ export default function DashboardPage() {
     });
   }
   
-  // Update form default values if userSettings change from context (e.g. initial load)
   useEffect(() => {
     settingsForm.reset({
       defaultSets: userSettings.defaultSets,
@@ -76,26 +70,6 @@ export default function DashboardPage() {
               </Link>
             </CardContent>
           </Card>
-
-          {upcomingWorkout && (
-             <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 font-headline text-xl">
-                        <CalendarClock className="text-primary" />
-                        Próximo Treino
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p className="font-semibold">{upcomingWorkout.workoutName}</p>
-                    <p className="text-sm text-muted-foreground">
-                        {format(new Date(upcomingWorkout.dateTime), "PPPp", { locale: ptBR })}
-                    </p>
-                    <Link href="/scheduler" className="mt-2">
-                        <Button variant="outline" size="sm">Ver Agenda</Button>
-                    </Link>
-                </CardContent>
-            </Card>
-          )}
 
           <Card>
             <CardHeader>
