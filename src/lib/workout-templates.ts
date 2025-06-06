@@ -36,7 +36,7 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
       { group: 'Glúteos', count: 2 },
       { group: 'Panturrilhas', count: 2 },
     ],
-    hasGlobalWarmup: false, // Changed from true to false
+    hasGlobalWarmup: false,
   },
   "Braços": {
     name: "Treino Modelo - Braços",
@@ -53,7 +53,7 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
     description: "Um treino para desenvolver deltoides e trapézio.",
     targetMuscleGroups: [
       { group: 'Ombros', count: 2 },
-      { group: 'Trapézio', count: 1 }, // Adjusted count for Trapézio as some shoulder exercises hit it
+      { group: 'Trapézio', count: 1 }, 
     ],
     hasGlobalWarmup: true,
   },
@@ -61,7 +61,7 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
     name: "Treino Modelo - Peitoral",
     description: "Um treino focado no desenvolvimento do peitoral.",
     targetMuscleGroups: [
-      { group: 'Peito', count: 3 }, // Increased count for more variety
+      { group: 'Peito', count: 3 }, 
     ],
     hasGlobalWarmup: true,
   },
@@ -69,7 +69,7 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
     name: "Treino Modelo - Costas",
     description: "Um treino para construir costas largas e densas.",
     targetMuscleGroups: [
-      { group: 'Costas', count: 3 }, // Increased count for more variety
+      { group: 'Costas', count: 3 }, 
     ],
     hasGlobalWarmup: true,
   },
@@ -96,14 +96,13 @@ export function generateWorkoutFromTemplate(
 
   const exercises: Exercise[] = [];
   const usedExerciseNames = new Set<string>();
+  const assignedWarmupForGroup = new Set<string>(); // Tracks groups that got a warmup exercise
 
   template.targetMuscleGroups.forEach(target => {
-    // Attempt to find exercises primarily targeting the group first
     let modelExercisesForGroup = Object.values(modelExerciseData)
       .flat()
-      .filter(ex => ex.muscleGroups.includes(target.group) && !usedExerciseNames.has(ex.name) && ex.muscleGroups[0] === target.group); // Prioritize if it's the main group
+      .filter(ex => ex.muscleGroups.includes(target.group) && !usedExerciseNames.has(ex.name) && ex.muscleGroups[0] === target.group);
 
-    // If not enough, get any exercise that includes the target group
     if (modelExercisesForGroup.length < target.count) {
         const additionalExercises = Object.values(modelExerciseData)
             .flat()
@@ -119,6 +118,14 @@ export function generateWorkoutFromTemplate(
     }
 
     selectedExercises.forEach(modelEx => {
+      let exerciseSpecificWarmup = false;
+      if (determineModelExerciseWarmup(modelEx)) { // Check if this exercise type *can* have a warmup
+        if (!assignedWarmupForGroup.has(target.group)) { // Is this the first exercise for this group getting a warmup?
+          exerciseSpecificWarmup = true;
+          assignedWarmupForGroup.add(target.group);
+        }
+      }
+
       exercises.push({
         id: generateId(),
         name: modelEx.name,
@@ -127,7 +134,7 @@ export function generateWorkoutFromTemplate(
         weight: modelEx.defaultWeight || '',
         muscleGroups: modelEx.muscleGroups,
         notes: modelEx.description,
-        hasWarmup: determineModelExerciseWarmup(modelEx),
+        hasWarmup: exerciseSpecificWarmup, // Apply determined warmup state
       });
       usedExerciseNames.add(modelEx.name);
     });
