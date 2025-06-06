@@ -3,7 +3,7 @@
 
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useEffect } from 'react';
-import type { Workout, WorkoutSession, UserSettings, Exercise } from '@/lib/types';
+import type { Workout, WorkoutSession, UserSettings, Exercise, SessionExercisePerformance } from '@/lib/types';
 
 interface AppContextType {
   workouts: Workout[];
@@ -13,8 +13,8 @@ interface AppContextType {
   getWorkoutById: (workoutId: string) => Workout | undefined;
 
   sessions: WorkoutSession[];
-  addSession: (session: Omit<WorkoutSession, 'id' | 'isCompleted' | 'warmupCompleted' | 'notes'>) => void;
-  completeSession: (sessionId: string) => void;
+  addSession: (session: Omit<WorkoutSession, 'id' | 'isCompleted' | 'warmupCompleted' | 'notes' | 'exercisePerformances'>) => void;
+  completeSession: (sessionId: string, performances: SessionExercisePerformance[]) => void;
   markWarmupAsCompleted: (sessionId: string, firstExerciseName?: string) => void;
   hasActiveSession: (workoutId: string) => boolean;
 
@@ -71,7 +71,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       id: generateId(),
       exercises: workoutData.exercises.map(ex => ({
         ...ex,
-        id: generateId(),
+        id: ex.id || generateId(), // Ensure exercise has an ID
         hasWarmup: ex.hasWarmup || false,
       })),
       repeatFrequencyDays: workoutData.repeatFrequencyDays || undefined,
@@ -107,18 +107,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return sessions.some(s => s.workoutId === workoutId && !s.isCompleted);
   };
 
-  const addSession = (sessionData: Omit<WorkoutSession, 'id' | 'isCompleted' | 'warmupCompleted' | 'notes'>) => {
+  const addSession = (sessionData: Omit<WorkoutSession, 'id' | 'isCompleted' | 'warmupCompleted' | 'notes' | 'exercisePerformances'>) => {
     const workout = getWorkoutById(sessionData.workoutId);
     let sessionNotes = `Iniciou ${sessionData.workoutName}.`;
-    let initialWarmupCompleted = false;
+    let initialWarmupCompleted = true;
+    let initialExercisePerformances: SessionExercisePerformance[] = [];
 
-    if (workout && workout.exercises.length > 0 && workout.exercises[0].hasWarmup) {
-      sessionNotes = `Iniciando aquecimento para ${workout.exercises[0].name}. Treino: ${sessionData.workoutName}.`;
-      initialWarmupCompleted = false; // Explicitly false as warm-up needs to be completed
-    } else {
-      // If no warm-up for the first exercise, or no exercises, consider warm-up phase "completed" or not applicable.
-      initialWarmupCompleted = true;
+    if (workout) {
+      initialExercisePerformances = workout.exercises.map(ex => ({
+        exerciseId: ex.id,
+        exerciseName: ex.name,
+        plannedWeight: ex.weight || "0", // Default to "0" if no planned weight
+        weightUsed: ex.weight || "0", // Pre-fill with planned weight, or "0"
+      }));
+
+      if (workout.exercises.length > 0 && workout.exercises[0].hasWarmup) {
+        sessionNotes = `Iniciando aquecimento para ${workout.exercises[0].name}. Treino: ${sessionData.workoutName}.`;
+        initialWarmupCompleted = false;
+      }
     }
+
 
     const newSession: WorkoutSession = {
       ...sessionData,
@@ -126,6 +134,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       isCompleted: false,
       notes: sessionNotes,
       warmupCompleted: initialWarmupCompleted,
+      exercisePerformances: initialExercisePerformances,
     };
     setSessions((prev) => [newSession, ...prev]);
   };
@@ -147,10 +156,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
   };
 
-  const completeSession = (sessionId: string) => {
+  const completeSession = (sessionId: string, performances: SessionExercisePerformance[]) => {
     setSessions(prev =>
       prev.map(session =>
-        session.id === sessionId ? { ...session, isCompleted: true, notes: `${session.notes || ''} Treino finalizado.` } : session
+        session.id === sessionId
+          ? {
+              ...session,
+              isCompleted: true,
+              notes: `${session.notes || ''} Treino finalizado. Pesos registrados.`,
+              exercisePerformances: performances,
+            }
+          : session
       )
     );
   };
