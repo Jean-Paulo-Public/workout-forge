@@ -24,21 +24,75 @@ import { ModelExerciseSelectionModal } from '@/components/ModelExerciseSelection
 import { modelExerciseData } from '@/lib/model-exercises';
 import { muscleGroupSuggestedFrequencies } from '@/lib/muscle-group-frequencies';
 
-const exerciseSchema = z.object({
+// Schema base para um exercício, permitindo campos opcionais inicialmente.
+const baseExerciseSchema = z.object({
   id: z.string().optional(),
-  name: z.string().min(2, "O nome do exercício é muito curto."),
-  sets: z.coerce.number().min(1, "As séries devem ser pelo menos 1."),
-  reps: z.string().min(1, "As repetições são obrigatórias."),
+  name: z.string(), // Nome inicialmente pode ser string vazia
+  sets: z.coerce.number().optional(), // Séries são opcionais na base, validadas condicionalmente
+  reps: z.string().optional(), // Reps são opcionais na base, validadas condicionalmente
   weight: z.string().optional(),
   muscleGroups: z.array(z.string()).optional(),
   notes: z.string().optional(),
   hasWarmup: z.boolean().optional(),
 });
 
+// Schema refinado para um exercício.
+// Se o nome do exercício for preenchido, então nome (comprimento), séries e repetições se tornam obrigatórios.
+const exerciseSchema = baseExerciseSchema.superRefine((data, ctx) => {
+  if (data.name.trim() !== '') { // Se o nome do exercício estiver preenchido
+    // Validar comprimento do nome
+    if (data.name.trim().length < 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.too_small,
+        minimum: 2,
+        type: "string",
+        inclusive: true,
+        message: "O nome do exercício é muito curto.",
+        path: ['name'],
+      });
+    }
+
+    // Validar séries
+    if (data.sets === undefined || data.sets === null) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "As séries são obrigatórias.", path: ['sets'] });
+    } else if (typeof data.sets === 'number' && isNaN(data.sets)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "As séries devem ser um número válido.", path: ['sets'] });
+    } else if (typeof data.sets === 'number' && data.sets < 1) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "As séries devem ser pelo menos 1.", path: ['sets'] });
+    } else if (typeof data.sets !== 'number') { // Fallback, should be caught by coerce.number if input was not numeric string
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Formato inválido para séries.", path: ['sets']});
+    }
+
+
+    // Validar repetições
+    if (data.reps === undefined || data.reps === null || data.reps.trim() === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "As repetições são obrigatórias.",
+        path: ['reps'],
+      });
+    }
+  }
+  // Se data.name.trim() === '', nenhuma issue é adicionada aqui, o exercício "vazio" passa nesta validação individual.
+  // Será filtrado posteriormente no schema do array de exercícios.
+});
+
+
 const workoutFormSchema = z.object({
   name: z.string().min(3, "O nome do treino deve ter pelo menos 3 caracteres."),
   description: z.string().optional(),
-  exercises: z.array(exerciseSchema).min(1, "Adicione pelo menos um exercício."),
+  exercises: z.array(exerciseSchema)
+    .transform(exercises => {
+      // Filtra exercícios onde o nome não foi preenchido.
+      // Esses exercícios "vazios" passaram pelo `exerciseSchema` porque os campos condicionais não foram validados.
+      return exercises.filter(ex => ex.name.trim() !== '');
+    })
+    .refine(filteredExercises => {
+      // Após filtrar, garante que pelo menos um exercício preenchido permaneça.
+      return filteredExercises.length > 0;
+    }, {
+      message: "Adicione pelo menos um exercício preenchido.",
+    }),
   repeatFrequencyDays: z.coerce.number().positive("A frequência deve ser um número positivo.").optional().or(z.literal('')),
 });
 
@@ -75,12 +129,13 @@ export default function WorkoutBuilderPage() {
     name: 'exercises',
   });
 
-  const updateWorkoutFrequencyBasedOnExercises = useCallback((currentExercises: Exercise[] = []) => {
+  const updateWorkoutFrequencyBasedOnExercises = useCallback((currentExercises: z.infer<typeof baseExerciseSchema>[] = []) => {
     let maxSuggestedFrequency = 0;
+    // Use `getValues` para obter os dados brutos do formulário, pois `currentExercises` pode ser antes da transformação/validação completa
     const exercisesToEvaluate = currentExercises.length > 0 ? currentExercises : form.getValues('exercises');
     
     exercisesToEvaluate.forEach(exercise => {
-      if (exercise.muscleGroups && exercise.muscleGroups.length > 0) {
+      if (exercise.name.trim() !== '' && exercise.muscleGroups && exercise.muscleGroups.length > 0) { // Considerar apenas exercícios preenchidos
         exercise.muscleGroups.forEach(group => {
           if (muscleGroupSuggestedFrequencies[group] && muscleGroupSuggestedFrequencies[group] > maxSuggestedFrequency) {
             maxSuggestedFrequency = muscleGroupSuggestedFrequencies[group];
@@ -90,9 +145,11 @@ export default function WorkoutBuilderPage() {
     });
 
     if (maxSuggestedFrequency > 0) {
-      const currentFrequency = form.getValues('repeatFrequencyDays');
-      if (currentFrequency === '' || currentFrequency === undefined || Number(currentFrequency) < maxSuggestedFrequency) {
-        form.setValue('repeatFrequencyDays', maxSuggestedFrequency);
+      const currentFrequencyField = form.getValues('repeatFrequencyDays');
+      const currentFrequency = currentFrequencyField === '' ? 0 : Number(currentFrequencyField); // Tratar '' como 0 para comparação
+
+      if (currentFrequency === 0 || currentFrequency < maxSuggestedFrequency) {
+         form.setValue('repeatFrequencyDays', maxSuggestedFrequency);
       }
     }
   }, [form]);
@@ -101,10 +158,8 @@ export default function WorkoutBuilderPage() {
     if (editingWorkoutId) {
       const workoutToEdit = getWorkoutById(editingWorkoutId);
       if (workoutToEdit) {
-        form.reset({
-          name: workoutToEdit.name,
-          description: workoutToEdit.description || '',
-          exercises: workoutToEdit.exercises.map(ex => ({
+        // Mapeia para o tipo esperado pelo formulário (baseExerciseSchema)
+        const formExercises = workoutToEdit.exercises.map(ex => ({
             id: ex.id || generateId(),
             name: ex.name,
             sets: ex.sets,
@@ -113,18 +168,24 @@ export default function WorkoutBuilderPage() {
             muscleGroups: ex.muscleGroups || [],
             notes: ex.notes || '',
             hasWarmup: ex.hasWarmup || false,
-          })),
+          }));
+
+        form.reset({
+          name: workoutToEdit.name,
+          description: workoutToEdit.description || '',
+          exercises: formExercises,
           repeatFrequencyDays: workoutToEdit.repeatFrequencyDays || undefined,
         });
-        // Ensure frequency is updated if exercises are loaded
-        if (workoutToEdit.exercises.length > 0) {
-            updateWorkoutFrequencyBasedOnExercises(workoutToEdit.exercises);
+        
+        if (formExercises.length > 0) {
+            updateWorkoutFrequencyBasedOnExercises(formExercises);
         }
       } else {
         toast({ title: "Erro", description: "Treino para edição não encontrado.", variant: "destructive" });
         router.push('/library');
       }
     } else {
+      // Se não estiver editando e não houver exercícios, adicione um padrão
       if (form.getValues('exercises').length === 0) {
         append({ 
           id: generateId(),
@@ -142,7 +203,7 @@ export default function WorkoutBuilderPage() {
 
 
   const appendNewExercise = (isModelExercise = false, modelExerciseDetails?: ModelExercise) => {
-    const newExercise: Exercise = { 
+    const newExerciseData = { 
       id: generateId(),
       name: modelExerciseDetails?.name || '', 
       sets: userSettings.defaultSets, 
@@ -150,13 +211,13 @@ export default function WorkoutBuilderPage() {
       weight: modelExerciseDetails?.defaultWeight || '',
       muscleGroups: modelExerciseDetails?.muscleGroups || [],
       notes: modelExerciseDetails?.description || '',
-      hasWarmup: isModelExercise, // Model exercises default to having warmup
+      hasWarmup: isModelExercise, 
     };
-    append(newExercise);
+    append(newExerciseData);
     
-    // Update workout frequency based on the newly added exercise's muscle groups
-    const currentExercises = [...form.getValues('exercises'), newExercise];
-    updateWorkoutFrequencyBasedOnExercises(currentExercises);
+    // Para cálculo da frequência, considera os exercícios já existentes mais o novo
+    const currentExercises = [...form.getValues('exercises')]; // Isso pega os valores atuais do RHF
+    updateWorkoutFrequencyBasedOnExercises(currentExercises); // RHF já terá o novo exercício na lista
   };
 
   const handleOpenMuscleGroupModal = (index: number) => {
@@ -166,11 +227,8 @@ export default function WorkoutBuilderPage() {
 
   const handleSaveMuscleGroups = (groups: string[]) => {
     if (editingExerciseIndex !== null) {
-      const currentExercises = form.getValues('exercises');
-      currentExercises[editingExerciseIndex].muscleGroups = groups;
-      // setValue will trigger a re-render and watch will pick up the change
       form.setValue(`exercises.${editingExerciseIndex}.muscleGroups`, groups); 
-      updateWorkoutFrequencyBasedOnExercises(currentExercises); // Pass all exercises
+      updateWorkoutFrequencyBasedOnExercises(form.getValues('exercises'));
     }
     setIsMuscleGroupModalOpen(false);
     setEditingExerciseIndex(null);
@@ -187,15 +245,14 @@ export default function WorkoutBuilderPage() {
   };
 
   const handleModelExerciseSelected = (modelExercise: ModelExercise) => {
-    appendNewExercise(true, modelExercise); // Pass true for isModelExercise
+    appendNewExercise(true, modelExercise);
     setIsSelectionModalOpen(false);
 
-    // Auto-fill workout name if it's empty
     if (!form.getValues('name').trim() && selectedExerciseCategory) {
       form.setValue('name', selectedExerciseCategory);
     }
     
-    setSelectedExerciseCategory(null); // Reset category after selection
+    setSelectedExerciseCategory(null);
     toast({
       title: "Exercício Modelo Adicionado!",
       description: `${modelExercise.name} foi adicionado ao seu treino.`,
@@ -204,20 +261,22 @@ export default function WorkoutBuilderPage() {
 
   async function onSubmit(values: WorkoutFormData) {
     setIsSaving(true);
+    // values.exercises já estarão filtrados aqui pelo `transform` do Zod schema.
+    // E os `sets` de cada exercício em `values.exercises` já serão números devido ao `z.coerce.number()`.
     const workoutData: Workout = {
       id: editingWorkoutId || generateId(),
       name: values.name,
       description: values.description,
       exercises: values.exercises.map(ex => ({ 
         id: ex.id || generateId(), 
-        name: ex.name,
-        sets: ex.sets,
-        reps: ex.reps,
+        name: ex.name, // Já sabemos que name.trim() !== ''
+        sets: ex.sets as number, // `sets` é number aqui por causa do coerce e validação
+        reps: ex.reps as string, // `reps` é string, validado como não vazio
         weight: ex.weight || undefined,
         muscleGroups: ex.muscleGroups || [],
         notes: ex.notes || undefined,
         hasWarmup: ex.hasWarmup || false,
-      } as Exercise)),
+      })),
       repeatFrequencyDays: values.repeatFrequencyDays ? Number(values.repeatFrequencyDays) : undefined,
     };
 
@@ -235,15 +294,16 @@ export default function WorkoutBuilderPage() {
       });
     }
     
+    // Reset form to initial state which includes one empty exercise row if not editing
     form.reset({
       name: '',
       description: '',
-      exercises: [], // Reset to empty, then add one default if not editing
+      exercises: [], // Clear exercises
       repeatFrequencyDays: undefined,
     });
-
-    // After reset, if not editing and no exercises, add one default
-    if (!editingWorkoutId && form.getValues('exercises').length === 0) {
+    
+    // After reset, add one default exercise row
+     if (!editingWorkoutId) { // Só adiciona o default se não estava editando (ou seja, novo treino)
         append({ 
             id: generateId(),
             name: '', 
@@ -323,11 +383,20 @@ export default function WorkoutBuilderPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="font-headline">Exercícios</CardTitle>
-                <CardDescription>Adicione exercícios ao seu plano de treino.</CardDescription>
+                <CardDescription>Adicione exercícios ao seu plano de treino. Exercícios com nome não preenchido serão ignorados ao salvar.</CardDescription>
+                 <FormField
+                  control={form.control}
+                  name="exercises"
+                  render={() => ( // Não precisa de field aqui, apenas para exibir a mensagem do array
+                    <FormItem>
+                       <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </CardHeader>
               <CardContent className="space-y-6">
-                {fields.map((field, index) => (
-                  <div key={field.id} className="p-4 border rounded-md space-y-4 relative">
+                {fields.map((item, index) => (
+                  <div key={item.id} className="p-4 border rounded-md space-y-4 relative">
                     <h3 className="font-medium">Exercício {index + 1}</h3>
                     <FormField
                       control={form.control}
@@ -427,7 +496,7 @@ export default function WorkoutBuilderPage() {
                       )}
                     />
 
-                    {fields.length > 1 && (
+                    {fields.length > 0 && ( // Condição para mostrar o botão de remover, antes era >1
                        <Button
                         type="button"
                         variant="destructive"
@@ -472,7 +541,7 @@ export default function WorkoutBuilderPage() {
           </form>
         </Form>
       </div>
-      {editingExerciseIndex !== null && (
+      {editingExerciseIndex !== null && form.getValues('exercises')?.[editingExerciseIndex] && ( // Adicionado verificação se o exercício existe
         <MuscleGroupSelectorModal
           isOpen={isMuscleGroupModalOpen}
           onClose={() => {
@@ -503,3 +572,4 @@ export default function WorkoutBuilderPage() {
     </AppLayout>
   );
 }
+
