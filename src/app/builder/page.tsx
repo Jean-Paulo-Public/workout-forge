@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Trash2, Save, Target, BookOpenCheck, Edit } from 'lucide-react';
+import { PlusCircle, Trash2, Save, Target, BookOpenCheck } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import type { Exercise, ModelExercise, Workout } from '@/lib/types';
@@ -22,9 +22,10 @@ import { MuscleGroupSelectorModal } from '@/components/MuscleGroupSelectorModal'
 import { ModelExerciseCategoryModal } from '@/components/ModelExerciseCategoryModal';
 import { ModelExerciseSelectionModal } from '@/components/ModelExerciseSelectionModal';
 import { modelExerciseData } from '@/lib/model-exercises';
+import { muscleGroupSuggestedFrequencies } from '@/lib/muscle-group-frequencies';
 
 const exerciseSchema = z.object({
-  id: z.string().optional(), // ID é opcional, pode não existir ao criar
+  id: z.string().optional(),
   name: z.string().min(2, "O nome do exercício é muito curto."),
   sets: z.coerce.number().min(1, "As séries devem ser pelo menos 1."),
   reps: z.string().min(1, "As repetições são obrigatórias."),
@@ -64,16 +65,7 @@ export default function WorkoutBuilderPage() {
     defaultValues: {
       name: '',
       description: '',
-      exercises: [{ 
-        id: generateId(),
-        name: '', 
-        sets: userSettings.defaultSets, 
-        reps: userSettings.defaultReps,
-        weight: '',
-        muscleGroups: [],
-        notes: '',
-        hasWarmup: false,
-      }],
+      exercises: [],
       repeatFrequencyDays: undefined,
     },
   });
@@ -83,6 +75,26 @@ export default function WorkoutBuilderPage() {
     name: 'exercises',
   });
 
+  const updateWorkoutFrequencyBasedOnExercises = useCallback((currentExercises: Exercise[] = []) => {
+    let maxSuggestedFrequency = 0;
+    (currentExercises.length > 0 ? currentExercises : form.getValues('exercises')).forEach(exercise => {
+      if (exercise.muscleGroups && exercise.muscleGroups.length > 0) {
+        exercise.muscleGroups.forEach(group => {
+          if (muscleGroupSuggestedFrequencies[group] && muscleGroupSuggestedFrequencies[group] > maxSuggestedFrequency) {
+            maxSuggestedFrequency = muscleGroupSuggestedFrequencies[group];
+          }
+        });
+      }
+    });
+
+    if (maxSuggestedFrequency > 0) {
+      const currentFrequency = form.getValues('repeatFrequencyDays');
+      if (currentFrequency === '' || currentFrequency === undefined || Number(currentFrequency) < maxSuggestedFrequency) {
+        form.setValue('repeatFrequencyDays', maxSuggestedFrequency);
+      }
+    }
+  }, [form]);
+
   useEffect(() => {
     if (editingWorkoutId) {
       const workoutToEdit = getWorkoutById(editingWorkoutId);
@@ -91,7 +103,7 @@ export default function WorkoutBuilderPage() {
           name: workoutToEdit.name,
           description: workoutToEdit.description || '',
           exercises: workoutToEdit.exercises.map(ex => ({
-            id: ex.id || generateId(), // Garante ID para consistência
+            id: ex.id || generateId(),
             name: ex.name,
             sets: ex.sets,
             reps: ex.reps,
@@ -107,24 +119,38 @@ export default function WorkoutBuilderPage() {
         router.push('/library');
       }
     } else {
-       if (fields.length === 0) {
-         appendNewExercise(false); // Garante que sempre haja um exercício ao criar novo
-       }
+      // Se não estiver editando e não houver exercícios, adicione um
+      if (form.getValues('exercises').length === 0) {
+        append({ 
+          id: generateId(),
+          name: '', 
+          sets: userSettings.defaultSets, 
+          reps: userSettings.defaultReps,
+          weight: '',
+          muscleGroups: [],
+          notes: '',
+          hasWarmup: false,
+        });
+      }
     }
   }, [editingWorkoutId, getWorkoutById, form, router, toast, userSettings.defaultSets, userSettings.defaultReps]);
 
 
-  const appendNewExercise = (isModelExercise = false) => {
-    append({ 
+  const appendNewExercise = (isModelExercise = false, modelExerciseData?: ModelExercise) => {
+    const newExercise: Exercise = { 
       id: generateId(),
-      name: '', 
+      name: modelExerciseData?.name || '', 
       sets: userSettings.defaultSets, 
       reps: userSettings.defaultReps,
-      weight: '',
-      muscleGroups: [],
-      notes: '',
-      hasWarmup: isModelExercise, // Model exercises start with warmup checked
-    });
+      weight: modelExerciseData?.defaultWeight || '',
+      muscleGroups: modelExerciseData?.muscleGroups || [],
+      notes: modelExerciseData?.description || '',
+      hasWarmup: isModelExercise,
+    };
+    append(newExercise);
+    if (newExercise.muscleGroups && newExercise.muscleGroups.length > 0) {
+      updateWorkoutFrequencyBasedOnExercises([...fields, newExercise]);
+    }
   };
 
   const handleOpenMuscleGroupModal = (index: number) => {
@@ -134,7 +160,10 @@ export default function WorkoutBuilderPage() {
 
   const handleSaveMuscleGroups = (groups: string[]) => {
     if (editingExerciseIndex !== null) {
+      const currentExercises = form.getValues('exercises');
+      currentExercises[editingExerciseIndex].muscleGroups = groups;
       form.setValue(`exercises.${editingExerciseIndex}.muscleGroups`, groups);
+      updateWorkoutFrequencyBasedOnExercises(currentExercises);
     }
     setIsMuscleGroupModalOpen(false);
     setEditingExerciseIndex(null);
@@ -151,16 +180,7 @@ export default function WorkoutBuilderPage() {
   };
 
   const handleModelExerciseSelected = (modelExercise: ModelExercise) => {
-    append({
-      id: generateId(), 
-      name: modelExercise.name,
-      sets: userSettings.defaultSets,
-      reps: userSettings.defaultReps,
-      weight: modelExercise.defaultWeight || '',
-      muscleGroups: modelExercise.muscleGroups,
-      notes: modelExercise.description,
-      hasWarmup: true, // Model exercises always include warmup by default
-    });
+    appendNewExercise(true, modelExercise);
     setIsSelectionModalOpen(false);
     setSelectedExerciseCategory(null);
     toast({
@@ -172,7 +192,7 @@ export default function WorkoutBuilderPage() {
   async function onSubmit(values: WorkoutFormData) {
     setIsSaving(true);
     const workoutData: Workout = {
-      id: editingWorkoutId || generateId(), // Use existing ID if editing, or generate new
+      id: editingWorkoutId || generateId(),
       name: values.name,
       description: values.description,
       exercises: values.exercises.map(ex => ({ 
@@ -202,7 +222,6 @@ export default function WorkoutBuilderPage() {
       });
     }
     
-    // Reset form to initial state for new workout creation
     form.reset({
       name: '',
       description: '',
@@ -218,7 +237,6 @@ export default function WorkoutBuilderPage() {
       }],
       repeatFrequencyDays: undefined,
     });
-    // Ensure one exercise field is present after reset if not editing
     if (!editingWorkoutId && form.getValues('exercises').length === 0) {
         appendNewExercise(false);
     }
