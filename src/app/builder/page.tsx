@@ -65,6 +65,7 @@ export default function WorkoutBuilderPage() {
       name: '',
       description: '',
       exercises: [{ 
+        id: generateId(),
         name: '', 
         sets: userSettings.defaultSets, 
         reps: userSettings.defaultReps,
@@ -90,7 +91,7 @@ export default function WorkoutBuilderPage() {
           name: workoutToEdit.name,
           description: workoutToEdit.description || '',
           exercises: workoutToEdit.exercises.map(ex => ({
-            id: ex.id,
+            id: ex.id || generateId(), // Garante ID para consistência
             name: ex.name,
             sets: ex.sets,
             reps: ex.reps,
@@ -106,24 +107,23 @@ export default function WorkoutBuilderPage() {
         router.push('/library');
       }
     } else {
-      // Se não está editando, garante que o primeiro exercício default seja adicionado se não houver campos.
        if (fields.length === 0) {
-         appendNewExercise();
+         appendNewExercise(false); // Garante que sempre haja um exercício ao criar novo
        }
     }
-  }, [editingWorkoutId, getWorkoutById, form, router, toast, userSettings.defaultSets, userSettings.defaultReps, fields.length]);
+  }, [editingWorkoutId, getWorkoutById, form, router, toast, userSettings.defaultSets, userSettings.defaultReps]);
 
 
   const appendNewExercise = (isModelExercise = false) => {
     append({ 
-      id: generateId(), // Gerar ID ao adicionar novo
+      id: generateId(),
       name: '', 
       sets: userSettings.defaultSets, 
       reps: userSettings.defaultReps,
       weight: '',
       muscleGroups: [],
       notes: '',
-      hasWarmup: isModelExercise,
+      hasWarmup: isModelExercise, // Model exercises start with warmup checked
     });
   };
 
@@ -152,14 +152,14 @@ export default function WorkoutBuilderPage() {
 
   const handleModelExerciseSelected = (modelExercise: ModelExercise) => {
     append({
-      id: generateId(), // Gerar ID ao adicionar
+      id: generateId(), 
       name: modelExercise.name,
       sets: userSettings.defaultSets,
       reps: userSettings.defaultReps,
       weight: modelExercise.defaultWeight || '',
       muscleGroups: modelExercise.muscleGroups,
       notes: modelExercise.description,
-      hasWarmup: true, 
+      hasWarmup: true, // Model exercises always include warmup by default
     });
     setIsSelectionModalOpen(false);
     setSelectedExerciseCategory(null);
@@ -171,11 +171,12 @@ export default function WorkoutBuilderPage() {
 
   async function onSubmit(values: WorkoutFormData) {
     setIsSaving(true);
-    const workoutData = {
+    const workoutData: Workout = {
+      id: editingWorkoutId || generateId(), // Use existing ID if editing, or generate new
       name: values.name,
       description: values.description,
       exercises: values.exercises.map(ex => ({ 
-        id: ex.id || generateId(), // Garante ID para novos exercícios na edição
+        id: ex.id || generateId(), 
         name: ex.name,
         sets: ex.sets,
         reps: ex.reps,
@@ -188,7 +189,7 @@ export default function WorkoutBuilderPage() {
     };
 
     if (editingWorkoutId) {
-      updateWorkout({ ...workoutData, id: editingWorkoutId });
+      updateWorkout(workoutData);
       toast({
         title: "Treino Atualizado!",
         description: `${values.name} foi atualizado na sua biblioteca.`,
@@ -201,10 +202,12 @@ export default function WorkoutBuilderPage() {
       });
     }
     
+    // Reset form to initial state for new workout creation
     form.reset({
       name: '',
       description: '',
       exercises: [{ 
+        id: generateId(),
         name: '', 
         sets: userSettings.defaultSets, 
         reps: userSettings.defaultReps,
@@ -215,6 +218,11 @@ export default function WorkoutBuilderPage() {
       }],
       repeatFrequencyDays: undefined,
     });
+    // Ensure one exercise field is present after reset if not editing
+    if (!editingWorkoutId && form.getValues('exercises').length === 0) {
+        appendNewExercise(false);
+    }
+
     setIsSaving(false);
     router.push('/library');
   }
@@ -267,7 +275,10 @@ export default function WorkoutBuilderPage() {
                       <FormControl>
                         <Input type="number" placeholder="ex: 7 (para repetir semanalmente)" {...field} onChange={e => field.onChange(e.target.value === '' ? '' : Number(e.target.value))} value={field.value ?? ''} />
                       </FormControl>
-                      <FormDescription>Define com que frequência este treino aparecerá na "Esteira de Treinos" após ser concluído.</FormDescription>
+                      <FormDescription>
+                        Define com que frequência este treino aparecerá na "Esteira de Treinos" após ser concluído ou se ainda não foi feito.
+                        Lembre-se de ajustar os dias de descanso conforme suas necessidades e, se possível, consulte um profissional de educação física.
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

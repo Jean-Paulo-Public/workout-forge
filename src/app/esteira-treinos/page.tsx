@@ -34,7 +34,8 @@ export default function TrainingMatPage() {
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       if (completedSessions.length === 0) {
-        return true; // Se nunca foi feito, está disponível
+        // Se nunca foi feito, mas tem frequência, está disponível
+        return true; 
       }
 
       const lastCompletionDate = parseISO(completedSessions[0].date);
@@ -78,7 +79,7 @@ export default function TrainingMatPage() {
       <div className="space-y-6">
         <h1 className="text-3xl font-bold font-headline">Esteira de Treinos</h1>
         <CardDescription>
-          Aqui estão os treinos que estão prontos para serem feitos novamente, com base na frequência que você definiu.
+          Aqui estão os treinos que estão prontos para serem feitos novamente, com base na frequência que você definiu, ou treinos novos que ainda não foram iniciados.
         </CardDescription>
 
         {availableWorkouts.length === 0 ? (
@@ -91,10 +92,10 @@ export default function TrainingMatPage() {
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-2">
-                Nenhum treino está pronto para ser repetido no momento.
+                Nenhum treino está pronto para ser repetido ou iniciado no momento.
               </p>
               <p className="text-sm text-muted-foreground">
-                Certifique-se de que seus treinos na <Link href="/library" className="underline hover:text-primary">biblioteca</Link> tenham uma frequência de repetição definida e que já tenham sido concluídos anteriormente.
+                Certifique-se de que seus treinos na <Link href="/library" className="underline hover:text-primary">biblioteca</Link> tenham uma frequência de repetição definida. Treinos concluídos reaparecerão após o período de descanso.
               </p>
             </CardContent>
           </Card>
