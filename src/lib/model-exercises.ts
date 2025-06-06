@@ -11,7 +11,7 @@ export const modelExerciseData: ModelExerciseCategories = {
     },
     {
       name: "Supino Inclinado (Halteres)",
-      muscleGroups: ["Peito (Superior)", "Ombros", "Tríceps"],
+      muscleGroups: ["Peito", "Ombros", "Tríceps"],
       description: "Deite-se em um banco inclinado (30-45 graus). Segure um halter em cada mão na altura do peito, com as palmas voltadas para frente. Empurre os halteres para cima até quase se tocarem, e desça controladamente.",
       defaultWeight: "Ajustável"
     },
@@ -31,19 +31,19 @@ export const modelExerciseData: ModelExerciseCategories = {
   "Costas": [
     {
       name: "Barra Fixa (Puxada)",
-      muscleGroups: ["Costas (Latíssimo do Dorso)", "Bíceps", "Antebraço"],
+      muscleGroups: ["Costas", "Bíceps", "Antebraço"],
       description: "Segure a barra com as mãos em pronação (palmas para frente) ou supinação (palmas para você), um pouco mais largas que os ombros. Puxe o corpo para cima até o queixo ultrapassar a barra. Desça controladamente.",
       defaultWeight: "Peso Corporal"
     },
     {
       name: "Remada Curvada (Barra)",
-      muscleGroups: ["Costas (Meio das Costas)", "Bíceps", "Lombar"],
+      muscleGroups: ["Costas", "Bíceps", "Lombar"],
       description: "Incline o tronco para frente mantendo a coluna reta, joelhos levemente flexionados. Segure a barra com pegada pronada. Puxe a barra em direção ao abdômen, contraindo as escápulas. Desça controladamente.",
       defaultWeight: "Ajustável"
     },
     {
       name: "Puxada Alta (Pulley)",
-      muscleGroups: ["Costas (Latíssimo do Dorso)", "Bíceps"],
+      muscleGroups: ["Costas", "Bíceps"],
       description: "Sente-se no aparelho com os joelhos presos sob o suporte. Segure a barra com pegada aberta. Puxe a barra em direção ao peito, inclinando levemente o tronco para trás. Retorne controladamente.",
       defaultWeight: "Ajustável"
     }
@@ -80,22 +80,42 @@ export const modelExerciseData: ModelExerciseCategories = {
       defaultWeight: "Peso Corporal / Halteres"
     }
   ],
+  "Glúteos": [
+    {
+      name: "Elevação Pélvica (Hip Thrust)",
+      muscleGroups: ["Glúteos", "Pernas (Posteriores)"],
+      description: "Apoie as costas em um banco e os pés no chão. Coloque uma barra sobre o quadril. Empurre o quadril para cima, contraindo os glúteos, até o corpo formar uma linha reta dos ombros aos joelhos. Desça controladamente.",
+      defaultWeight: "Ajustável"
+    },
+    {
+      name: "Coice de Mula (Cabo/Polia)",
+      muscleGroups: ["Glúteos"],
+      description: "Em quatro apoios ou em pé, prenda a tornozeleira do cabo no tornozelo. Mantenha o abdômen contraído e a coluna neutra. Estenda a perna para trás e para cima, contraindo o glúteo. Retorne controladamente.",
+      defaultWeight: "Ajustável"
+    },
+    {
+      name: "Agachamento Sumô (Halter)",
+      muscleGroups: ["Glúteos", "Pernas (Interno da Coxa)", "Pernas (Quadríceps)"],
+      description: "Fique em pé com os pés mais afastados que a largura dos ombros e pontas dos pés voltadas para fora. Segure um halter verticalmente à frente do corpo. Agache, mantendo a coluna reta e empurrando os joelhos para fora. Volte à posição inicial.",
+      defaultWeight: "Ajustável"
+    }
+  ],
   "Ombros": [
     {
       name: "Desenvolvimento Militar (Barra ou Halteres)",
-      muscleGroups: ["Ombros (Deltoide Anterior e Medial)", "Tríceps"],
+      muscleGroups: ["Ombros", "Tríceps"],
       description: "Em pé ou sentado, segure a barra na altura dos ombros (pegada pronada) ou halteres ao lado da cabeça. Empurre para cima até os braços quase esticarem. Desça controladamente.",
       defaultWeight: "Ajustável"
     },
     {
       name: "Elevação Lateral (Halteres)",
-      muscleGroups: ["Ombros (Deltoide Medial)"],
+      muscleGroups: ["Ombros"],
       description: "Em pé, segure um halter em cada mão ao lado do corpo. Eleve os braços lateralmente até a altura dos ombros, mantendo os cotovelos levemente flexionados. Desça controladamente.",
       defaultWeight: "Ajustável"
     },
     {
       name: "Elevação Frontal (Halteres ou Anilha)",
-      muscleGroups: ["Ombros (Deltoide Anterior)"],
+      muscleGroups: ["Ombros"],
       description: "Em pé, segure halteres ou uma anilha à frente do corpo. Eleve os braços à frente até a altura dos ombros. Desça controladamente.",
       defaultWeight: "Ajustável"
     }
@@ -126,16 +146,38 @@ export const modelExerciseData: ModelExerciseCategories = {
       defaultWeight: "Ajustável"
     }
   ],
+  "Cardio": [
+    {
+      name: "Corrida (Esteira/Rua)",
+      muscleGroups: ["Cardio"],
+      description: "Corrida em ritmo moderado ou intervalado para melhorar a capacidade cardiovascular.",
+    },
+    {
+      name: "Bicicleta Ergométrica",
+      muscleGroups: ["Cardio"],
+      description: "Pedalar em ritmo constante ou com variações de intensidade. Ótimo para aquecimento ou treino cardiovascular.",
+    },
+    {
+      name: "Elíptico (Transport)",
+      muscleGroups: ["Cardio"],
+      description: "Movimento de baixo impacto que simula corrida, subida de escadas e caminhada, trabalhando diversos grupos musculares simultaneamente.",
+    },
+    {
+      name: "Pular Corda",
+      muscleGroups: ["Cardio"],
+      description: "Exercício cardiovascular completo e de alta intensidade que melhora coordenação e resistência.",
+    }
+  ],
   "Outros": [
     {
       name: "Prancha Abdominal",
-      muscleGroups: ["Abdômen", "Lombar", "Core"],
+      muscleGroups: ["Abdômen", "Lombar"],
       description: "Apoie os antebraços e as pontas dos pés no chão. Mantenha o corpo reto da cabeça aos calcanhares, contraindo o abdômen e os glúteos. Segure a posição pelo tempo desejado.",
       defaultWeight: "Peso Corporal"
     },
     {
       name: "Abdominal Supra (Crunch)",
-      muscleGroups: ["Abdômen (Superior)"],
+      muscleGroups: ["Abdômen"],
       description: "Deite-se de costas com os joelhos flexionados e pés no chão. Mãos atrás da cabeça ou cruzadas no peito. Eleve a cabeça e os ombros do chão, contraindo o abdômen. Desça controladamente.",
       defaultWeight: "Peso Corporal"
     },

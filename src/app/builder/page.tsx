@@ -77,7 +77,9 @@ export default function WorkoutBuilderPage() {
 
   const updateWorkoutFrequencyBasedOnExercises = useCallback((currentExercises: Exercise[] = []) => {
     let maxSuggestedFrequency = 0;
-    (currentExercises.length > 0 ? currentExercises : form.getValues('exercises')).forEach(exercise => {
+    const exercisesToEvaluate = currentExercises.length > 0 ? currentExercises : form.getValues('exercises');
+    
+    exercisesToEvaluate.forEach(exercise => {
       if (exercise.muscleGroups && exercise.muscleGroups.length > 0) {
         exercise.muscleGroups.forEach(group => {
           if (muscleGroupSuggestedFrequencies[group] && muscleGroupSuggestedFrequencies[group] > maxSuggestedFrequency) {
@@ -114,12 +116,15 @@ export default function WorkoutBuilderPage() {
           })),
           repeatFrequencyDays: workoutToEdit.repeatFrequencyDays || undefined,
         });
+        // Ensure frequency is updated if exercises are loaded
+        if (workoutToEdit.exercises.length > 0) {
+            updateWorkoutFrequencyBasedOnExercises(workoutToEdit.exercises);
+        }
       } else {
         toast({ title: "Erro", description: "Treino para edição não encontrado.", variant: "destructive" });
         router.push('/library');
       }
     } else {
-      // Se não estiver editando e não houver exercícios, adicione um
       if (form.getValues('exercises').length === 0) {
         append({ 
           id: generateId(),
@@ -133,24 +138,25 @@ export default function WorkoutBuilderPage() {
         });
       }
     }
-  }, [editingWorkoutId, getWorkoutById, form, router, toast, userSettings.defaultSets, userSettings.defaultReps]);
+  }, [editingWorkoutId, getWorkoutById, form, router, toast, userSettings.defaultSets, userSettings.defaultReps, append, updateWorkoutFrequencyBasedOnExercises]);
 
 
-  const appendNewExercise = (isModelExercise = false, modelExerciseData?: ModelExercise) => {
+  const appendNewExercise = (isModelExercise = false, modelExerciseDetails?: ModelExercise) => {
     const newExercise: Exercise = { 
       id: generateId(),
-      name: modelExerciseData?.name || '', 
+      name: modelExerciseDetails?.name || '', 
       sets: userSettings.defaultSets, 
       reps: userSettings.defaultReps,
-      weight: modelExerciseData?.defaultWeight || '',
-      muscleGroups: modelExerciseData?.muscleGroups || [],
-      notes: modelExerciseData?.description || '',
-      hasWarmup: isModelExercise,
+      weight: modelExerciseDetails?.defaultWeight || '',
+      muscleGroups: modelExerciseDetails?.muscleGroups || [],
+      notes: modelExerciseDetails?.description || '',
+      hasWarmup: isModelExercise, // Model exercises default to having warmup
     };
     append(newExercise);
-    if (newExercise.muscleGroups && newExercise.muscleGroups.length > 0) {
-      updateWorkoutFrequencyBasedOnExercises([...fields, newExercise]);
-    }
+    
+    // Update workout frequency based on the newly added exercise's muscle groups
+    const currentExercises = [...form.getValues('exercises'), newExercise];
+    updateWorkoutFrequencyBasedOnExercises(currentExercises);
   };
 
   const handleOpenMuscleGroupModal = (index: number) => {
@@ -162,8 +168,9 @@ export default function WorkoutBuilderPage() {
     if (editingExerciseIndex !== null) {
       const currentExercises = form.getValues('exercises');
       currentExercises[editingExerciseIndex].muscleGroups = groups;
-      form.setValue(`exercises.${editingExerciseIndex}.muscleGroups`, groups);
-      updateWorkoutFrequencyBasedOnExercises(currentExercises);
+      // setValue will trigger a re-render and watch will pick up the change
+      form.setValue(`exercises.${editingExerciseIndex}.muscleGroups`, groups); 
+      updateWorkoutFrequencyBasedOnExercises(currentExercises); // Pass all exercises
     }
     setIsMuscleGroupModalOpen(false);
     setEditingExerciseIndex(null);
@@ -180,9 +187,15 @@ export default function WorkoutBuilderPage() {
   };
 
   const handleModelExerciseSelected = (modelExercise: ModelExercise) => {
-    appendNewExercise(true, modelExercise);
+    appendNewExercise(true, modelExercise); // Pass true for isModelExercise
     setIsSelectionModalOpen(false);
-    setSelectedExerciseCategory(null);
+
+    // Auto-fill workout name if it's empty
+    if (!form.getValues('name').trim() && selectedExerciseCategory) {
+      form.setValue('name', selectedExerciseCategory);
+    }
+    
+    setSelectedExerciseCategory(null); // Reset category after selection
     toast({
       title: "Exercício Modelo Adicionado!",
       description: `${modelExercise.name} foi adicionado ao seu treino.`,
@@ -225,21 +238,24 @@ export default function WorkoutBuilderPage() {
     form.reset({
       name: '',
       description: '',
-      exercises: [{ 
-        id: generateId(),
-        name: '', 
-        sets: userSettings.defaultSets, 
-        reps: userSettings.defaultReps,
-        weight: '',
-        muscleGroups: [],
-        notes: '',
-        hasWarmup: false,
-      }],
+      exercises: [], // Reset to empty, then add one default if not editing
       repeatFrequencyDays: undefined,
     });
+
+    // After reset, if not editing and no exercises, add one default
     if (!editingWorkoutId && form.getValues('exercises').length === 0) {
-        appendNewExercise(false);
+        append({ 
+            id: generateId(),
+            name: '', 
+            sets: userSettings.defaultSets, 
+            reps: userSettings.defaultReps,
+            weight: '',
+            muscleGroups: [],
+            notes: '',
+            hasWarmup: false,
+        });
     }
+
 
     setIsSaving(false);
     router.push('/library');
