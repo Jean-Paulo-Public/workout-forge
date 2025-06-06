@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAppContext } from '@/contexts/AppContext';
 import type { Workout, Exercise } from '@/lib/types';
-import { PlusCircle, Trash2, Play, Eye, Target, Flame, Edit, Repeat, AlertTriangle, CalendarDays } from 'lucide-react';
+import { PlusCircle, Trash2, Play, Eye, Target, Flame, Edit, Repeat, AlertTriangle, CalendarDays, LayoutGrid } from 'lucide-react';
 import Link from 'next/link';
 import {
   AlertDialog,
@@ -25,12 +25,15 @@ import { useRouter } from 'next/navigation';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Badge } from "@/components/ui/badge";
+import { WorkoutTemplateSelectionModal } from '@/components/WorkoutTemplateSelectionModal';
+import { generateWorkoutFromTemplate } from '@/lib/workout-templates';
 
 export default function WorkoutLibraryPage() {
-  const { workouts, deleteWorkout, addSession, getWorkoutById, hasActiveSession } = useAppContext();
+  const { workouts, deleteWorkout, addSession, getWorkoutById, hasActiveSession, userSettings, addWorkout: addContextWorkout } = useAppContext();
   const { toast } = useToast();
   const router = useRouter();
   const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null);
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
 
   const handleDeleteWorkout = (workoutId: string) => {
     deleteWorkout(workoutId);
@@ -93,16 +96,43 @@ export default function WorkoutLibraryPage() {
     return display;
   };
 
+  const handleCreateWorkoutFromTemplate = (templateKey: string) => {
+    const generatedWorkoutData = generateWorkoutFromTemplate(templateKey, userSettings);
+    if (generatedWorkoutData) {
+      addContextWorkout(generatedWorkoutData);
+      toast({
+        title: "Treino Modelo Adicionado!",
+        description: `O treino "${generatedWorkoutData.name}" foi adicionado à sua biblioteca.`
+      });
+    } else {
+      toast({
+        title: "Erro ao Gerar Treino",
+        description: "Não foi possível gerar o treino a partir do modelo selecionado.",
+        variant: "destructive"
+      });
+    }
+    setIsTemplateModalOpen(false);
+  };
+
   return (
     <AppLayout>
       <div className="space-y-6">
         <div className="flex flex-col items-start gap-y-3 sm:flex-row sm:justify-between sm:items-center">
           <h1 className="text-2xl sm:text-3xl font-bold font-headline">Treinos</h1>
-          <Link href="/builder" className="w-full sm:w-auto">
-            <Button className="w-full sm:w-auto">
-              <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Novo Treino
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button 
+              className="w-full sm:w-auto" 
+              variant="outline" 
+              onClick={() => setIsTemplateModalOpen(true)}
+            >
+              <LayoutGrid className="mr-2 h-4 w-4" /> Adicionar via Modelo
             </Button>
-          </Link>
+            <Link href="/builder" className="w-full sm:w-auto">
+              <Button className="w-full sm:w-auto">
+                <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Novo Treino
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {workouts.length === 0 ? (
@@ -112,11 +142,19 @@ export default function WorkoutLibraryPage() {
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-4">
-                Crie seu primeiro plano de treino usando o Construtor de Treinos.
+                Crie seu primeiro plano de treino usando o Construtor de Treinos ou adicione um treino modelo.
               </p>
-              <Link href="/builder">
-                <Button variant="outline">Ir para o Construtor</Button>
-              </Link>
+              <div className="flex justify-center gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsTemplateModalOpen(true)}
+                >
+                   <LayoutGrid className="mr-2 h-4 w-4" /> Adicionar via Modelo
+                </Button>
+                <Link href="/builder">
+                  <Button variant="default">Ir para o Construtor</Button>
+                </Link>
+              </div>
             </CardContent>
           </Card>
         ) : (
@@ -260,6 +298,12 @@ export default function WorkoutLibraryPage() {
           </AlertDialogContent>
         </AlertDialog>
       )}
+
+      <WorkoutTemplateSelectionModal
+        isOpen={isTemplateModalOpen}
+        onClose={() => setIsTemplateModalOpen(false)}
+        onSelectTemplate={handleCreateWorkoutFromTemplate}
+      />
     </AppLayout>
   );
 }
