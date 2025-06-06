@@ -17,8 +17,8 @@ import {
 
 const navItems = [
   { href: '/dashboard', label: 'Painel', icon: LayoutDashboard },
+  { href: '/library', label: 'Treinos', icon: LibraryBig },
   { href: '/builder', label: 'Construtor de Treinos', icon: PlusSquare },
-  { href: '/library', label: 'Biblioteca de Treinos', icon: LibraryBig },
   { href: '/progress', label: 'Acompanhamento', icon: BarChart3 },
   { href: '/scheduler', label: 'Agendador', icon: CalendarClock },
 ];
