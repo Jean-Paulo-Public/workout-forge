@@ -13,17 +13,18 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Trash2, Save, Target, BookOpenCheck } from 'lucide-react';
+import { PlusCircle, Trash2, Save, Target, BookOpenCheck, Edit } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { useToast } from '@/hooks/use-toast';
-import type { Exercise, ModelExercise } from '@/lib/types';
-import { useRouter } from 'next/navigation';
+import type { Exercise, ModelExercise, Workout } from '@/lib/types';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { MuscleGroupSelectorModal } from '@/components/MuscleGroupSelectorModal';
 import { ModelExerciseCategoryModal } from '@/components/ModelExerciseCategoryModal';
 import { ModelExerciseSelectionModal } from '@/components/ModelExerciseSelectionModal';
 import { modelExerciseData } from '@/lib/model-exercises';
 
 const exerciseSchema = z.object({
+  id: z.string().optional(), // ID é opcional, pode não existir ao criar
   name: z.string().min(2, "O nome do exercício é muito curto."),
   sets: z.coerce.number().min(1, "As séries devem ser pelo menos 1."),
   reps: z.string().min(1, "As repetições são obrigatórias."),
@@ -37,6 +38,7 @@ const workoutFormSchema = z.object({
   name: z.string().min(3, "O nome do treino deve ter pelo menos 3 caracteres."),
   description: z.string().optional(),
   exercises: z.array(exerciseSchema).min(1, "Adicione pelo menos um exercício."),
+  repeatFrequencyDays: z.coerce.number().positive("A frequência deve ser um número positivo.").optional().or(z.literal('')),
 });
 
 type WorkoutFormData = z.infer<typeof workoutFormSchema>;
@@ -44,18 +46,19 @@ type WorkoutFormData = z.infer<typeof workoutFormSchema>;
 const generateId = () => crypto.randomUUID();
 
 export default function WorkoutBuilderPage() {
-  const { addWorkout, userSettings } = useAppContext();
+  const { addWorkout, updateWorkout, getWorkoutById, userSettings } = useAppContext();
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editingWorkoutId = searchParams.get('editId');
+
   const [isSaving, setIsSaving] = useState(false);
-  
   const [isMuscleGroupModalOpen, setIsMuscleGroupModalOpen] = useState(false);
   const [editingExerciseIndex, setEditingExerciseIndex] = useState<number | null>(null);
-
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false);
   const [selectedExerciseCategory, setSelectedExerciseCategory] = useState<string | null>(null);
-
+  
   const form = useForm<WorkoutFormData>({
     resolver: zodResolver(workoutFormSchema),
     defaultValues: {
@@ -70,31 +73,59 @@ export default function WorkoutBuilderPage() {
         notes: '',
         hasWarmup: false,
       }],
+      repeatFrequencyDays: undefined,
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, update } = useFieldArray({
     control: form.control,
     name: 'exercises',
   });
-  
+
   useEffect(() => {
-    if (fields.length === 0) {
-       appendNewExercise();
+    if (editingWorkoutId) {
+      const workoutToEdit = getWorkoutById(editingWorkoutId);
+      if (workoutToEdit) {
+        form.reset({
+          name: workoutToEdit.name,
+          description: workoutToEdit.description || '',
+          exercises: workoutToEdit.exercises.map(ex => ({
+            id: ex.id,
+            name: ex.name,
+            sets: ex.sets,
+            reps: ex.reps,
+            weight: ex.weight || '',
+            muscleGroups: ex.muscleGroups || [],
+            notes: ex.notes || '',
+            hasWarmup: ex.hasWarmup || false,
+          })),
+          repeatFrequencyDays: workoutToEdit.repeatFrequencyDays || undefined,
+        });
+      } else {
+        toast({ title: "Erro", description: "Treino para edição não encontrado.", variant: "destructive" });
+        router.push('/library');
+      }
+    } else {
+      // Se não está editando, garante que o primeiro exercício default seja adicionado se não houver campos.
+       if (fields.length === 0) {
+         appendNewExercise();
+       }
     }
-  }, [userSettings, fields.length, append]);
+  }, [editingWorkoutId, getWorkoutById, form, router, toast, userSettings.defaultSets, userSettings.defaultReps, fields.length]);
+
 
   const appendNewExercise = (isModelExercise = false) => {
     append({ 
+      id: generateId(), // Gerar ID ao adicionar novo
       name: '', 
       sets: userSettings.defaultSets, 
       reps: userSettings.defaultReps,
       weight: '',
       muscleGroups: [],
       notes: '',
-      hasWarmup: isModelExercise, // true if model, false if manual
+      hasWarmup: isModelExercise,
     });
-  }
+  };
 
   const handleOpenMuscleGroupModal = (index: number) => {
     setEditingExerciseIndex(index);
@@ -121,13 +152,14 @@ export default function WorkoutBuilderPage() {
 
   const handleModelExerciseSelected = (modelExercise: ModelExercise) => {
     append({
+      id: generateId(), // Gerar ID ao adicionar
       name: modelExercise.name,
       sets: userSettings.defaultSets,
       reps: userSettings.defaultReps,
       weight: modelExercise.defaultWeight || '',
       muscleGroups: modelExercise.muscleGroups,
       notes: modelExercise.description,
-      hasWarmup: true, // Model exercises always have warmup
+      hasWarmup: true, 
     });
     setIsSelectionModalOpen(false);
     setSelectedExerciseCategory(null);
@@ -139,23 +171,36 @@ export default function WorkoutBuilderPage() {
 
   async function onSubmit(values: WorkoutFormData) {
     setIsSaving(true);
-    const newWorkout = {
+    const workoutData = {
       name: values.name,
       description: values.description,
       exercises: values.exercises.map(ex => ({ 
-        ...ex, 
-        id: generateId(),
+        id: ex.id || generateId(), // Garante ID para novos exercícios na edição
+        name: ex.name,
+        sets: ex.sets,
+        reps: ex.reps,
         weight: ex.weight || undefined,
         muscleGroups: ex.muscleGroups || [],
         notes: ex.notes || undefined,
         hasWarmup: ex.hasWarmup || false,
       } as Exercise)),
+      repeatFrequencyDays: values.repeatFrequencyDays ? Number(values.repeatFrequencyDays) : undefined,
     };
-    addWorkout(newWorkout);
-    toast({
-      title: "Treino Salvo!",
-      description: `${values.name} foi adicionado à sua biblioteca.`,
-    });
+
+    if (editingWorkoutId) {
+      updateWorkout({ ...workoutData, id: editingWorkoutId });
+      toast({
+        title: "Treino Atualizado!",
+        description: `${values.name} foi atualizado na sua biblioteca.`,
+      });
+    } else {
+      addWorkout(workoutData);
+      toast({
+        title: "Treino Salvo!",
+        description: `${values.name} foi adicionado à sua biblioteca.`,
+      });
+    }
+    
     form.reset({
       name: '',
       description: '',
@@ -168,6 +213,7 @@ export default function WorkoutBuilderPage() {
         notes: '',
         hasWarmup: false,
       }],
+      repeatFrequencyDays: undefined,
     });
     setIsSaving(false);
     router.push('/library');
@@ -176,7 +222,9 @@ export default function WorkoutBuilderPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold font-headline">Construtor de Treinos</h1>
+        <h1 className="text-3xl font-bold font-headline">
+          {editingWorkoutId ? 'Editar Treino' : 'Construtor de Treinos'}
+        </h1>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
             <Card>
@@ -206,6 +254,20 @@ export default function WorkoutBuilderPage() {
                       <FormControl>
                         <Textarea placeholder="ex: Foco em movimentos compostos, 60s de descanso." {...field} />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="repeatFrequencyDays"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Repetir a cada (dias) - Opcional</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="ex: 7 (para repetir semanalmente)" {...field} onChange={e => field.onChange(e.target.value === '' ? '' : Number(e.target.value))} value={field.value ?? ''} />
+                      </FormControl>
+                      <FormDescription>Define com que frequência este treino aparecerá na "Esteira de Treinos" após ser concluído.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -358,7 +420,7 @@ export default function WorkoutBuilderPage() {
               </CardContent>
               <CardFooter>
                 <Button type="submit" disabled={isSaving}>
-                  <Save className="mr-2 h-4 w-4" /> {isSaving ? 'Salvando...' : 'Salvar Treino'}
+                  <Save className="mr-2 h-4 w-4" /> {isSaving ? 'Salvando...' : (editingWorkoutId ? 'Salvar Alterações' : 'Salvar Treino')}
                 </Button>
               </CardFooter>
             </Card>

@@ -17,6 +17,7 @@ export interface Workout {
   name: string;
   description?: string;
   exercises: Exercise[];
+  repeatFrequencyDays?: number; // Novo campo para frequência de repetição
   // Optional: category, lastPerformed (Date string), etc.
 }
 

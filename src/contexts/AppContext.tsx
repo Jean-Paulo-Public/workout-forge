@@ -31,7 +31,7 @@ const generateId = () => crypto.randomUUID();
 
 const DEFAULT_USER_SETTINGS: UserSettings = {
   defaultSets: 3,
-  defaultReps: '8', // Alterado de '10-12' para '8'
+  defaultReps: '8', 
 };
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -83,15 +83,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
       exercises: workoutData.exercises.map(ex => ({
         ...ex, 
         id: generateId(),
-        hasWarmup: ex.hasWarmup || false, // Garante que hasWarmup esteja presente
-      }))
+        hasWarmup: ex.hasWarmup || false,
+      })),
+      repeatFrequencyDays: workoutData.repeatFrequencyDays || undefined,
     };
     setWorkouts((prev) => [...prev, newWorkout]);
   };
 
   const updateWorkout = (updatedWorkout: Workout) => {
     setWorkouts((prev) =>
-      prev.map((w) => (w.id === updatedWorkout.id ? updatedWorkout : w))
+      prev.map((w) => (w.id === updatedWorkout.id ? {
+        ...updatedWorkout,
+        repeatFrequencyDays: updatedWorkout.repeatFrequencyDays || undefined,
+        exercises: updatedWorkout.exercises.map(ex => ({
+          ...ex,
+          id: ex.id || generateId(), // Garante que exercícios adicionados na edição tenham ID
+          hasWarmup: ex.hasWarmup || false,
+        }))
+      } : w))
     );
   };
 
@@ -99,7 +108,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setWorkouts((prev) => prev.filter((w) => w.id !== workoutId));
   };
   
-  const getWorkoutById = (workoutId: string) => {
+  const getWorkoutById = (workoutId: string): Workout | undefined => {
     return workouts.find(w => w.id === workoutId);
   };
 

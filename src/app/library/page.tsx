@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAppContext } from '@/contexts/AppContext';
 import type { Workout, Exercise } from '@/lib/types';
-import { PlusCircle, Trash2, Play, Eye, CalendarPlus, Target, Flame } from 'lucide-react';
+import { PlusCircle, Trash2, Play, Eye, CalendarPlus, Target, Flame, Edit, Repeat } from 'lucide-react';
 import Link from 'next/link';
 import {
   AlertDialog,
@@ -38,7 +38,6 @@ export default function WorkoutLibraryPage() {
   };
 
   const handleStartWorkout = (workoutToStart: Workout) => {
-    // Make sure we have the latest workout data, especially for exercises and hasWarmup
     const currentWorkoutDetails = getWorkoutById(workoutToStart.id);
     if (!currentWorkoutDetails) {
       toast({
@@ -53,7 +52,6 @@ export default function WorkoutLibraryPage() {
       workoutId: currentWorkoutDetails.id,
       workoutName: currentWorkoutDetails.name,
       date: new Date().toISOString(),
-      // Notes will be set within addSession based on warmup status of the first exercise
     });
     toast({
       title: "Treino Iniciado!",
@@ -64,6 +62,10 @@ export default function WorkoutLibraryPage() {
   
   const handleScheduleWorkout = (workout: Workout) => {
     router.push(`/scheduler?workoutId=${workout.id}&workoutName=${encodeURIComponent(workout.name)}`);
+  };
+
+  const handleEditWorkout = (workoutId: string) => {
+    router.push(`/builder?editId=${workoutId}`);
   };
 
   const formatExerciseDisplay = (exercise: Exercise) => {
@@ -118,6 +120,11 @@ export default function WorkoutLibraryPage() {
                   {workout.description && (
                     <CardDescription>{workout.description}</CardDescription>
                   )}
+                   {workout.repeatFrequencyDays && (
+                    <CardDescription className="text-xs text-muted-foreground flex items-center mt-1">
+                      <Repeat className="h-3 w-3 mr-1" /> Repetir a cada {workout.repeatFrequencyDays} dia(s)
+                    </CardDescription>
+                  )}
                 </CardHeader>
                 <CardContent className="flex-grow">
                   <h4 className="font-medium mb-1 text-sm">Exercícios:</h4>
@@ -136,6 +143,9 @@ export default function WorkoutLibraryPage() {
                 <CardFooter className="flex flex-wrap gap-2 justify-end">
                   <Button variant="outline" size="sm" onClick={() => setSelectedWorkout(workout)}>
                     <Eye className="mr-1 h-4 w-4" /> Visualizar
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => handleEditWorkout(workout.id)}>
+                    <Edit className="mr-1 h-4 w-4" /> Editar
                   </Button>
                   <Button variant="default" size="sm" onClick={() => handleStartWorkout(workout)}>
                     <Play className="mr-1 h-4 w-4" /> Iniciar
@@ -178,6 +188,11 @@ export default function WorkoutLibraryPage() {
               <AlertDialogTitle className="font-headline">{selectedWorkout.name}</AlertDialogTitle>
               {selectedWorkout.description && (
                 <AlertDialogDescription>{selectedWorkout.description}</AlertDialogDescription>
+              )}
+               {selectedWorkout.repeatFrequencyDays && (
+                <AlertDialogDescription className="text-xs text-muted-foreground flex items-center mt-1">
+                  <Repeat className="h-3 w-3 mr-1" /> Repetir a cada {selectedWorkout.repeatFrequencyDays} dia(s) após conclusão.
+                </AlertDialogDescription>
               )}
             </AlertDialogHeader>
             <div className="max-h-[60vh] overflow-y-auto pr-2 space-y-3 py-4">
