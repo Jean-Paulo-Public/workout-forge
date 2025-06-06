@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -7,15 +8,18 @@ import { z } from 'zod';
 import { AppLayout } from '@/components/layout/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { PlusCircle, Trash2, Save, Target } from 'lucide-react';
+import { PlusCircle, Trash2, Save, Target, BookOpenCheck } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { useToast } from '@/hooks/use-toast';
-import type { Exercise } from '@/lib/types';
+import type { Exercise, ModelExercise } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { MuscleGroupSelectorModal } from '@/components/MuscleGroupSelectorModal';
+import { ModelExerciseCategoryModal } from '@/components/ModelExerciseCategoryModal';
+import { ModelExerciseSelectionModal } from '@/components/ModelExerciseSelectionModal';
+import { modelExerciseData } from '@/lib/model-exercises';
 
 const exerciseSchema = z.object({
   name: z.string().min(2, "O nome do exercício é muito curto."),
@@ -23,6 +27,7 @@ const exerciseSchema = z.object({
   reps: z.string().min(1, "As repetições são obrigatórias."),
   weight: z.string().optional(),
   muscleGroups: z.array(z.string()).optional(),
+  notes: z.string().optional(),
 });
 
 const workoutFormSchema = z.object({
@@ -40,8 +45,13 @@ export default function WorkoutBuilderPage() {
   const { toast } = useToast();
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  const [isMuscleGroupModalOpen, setIsMuscleGroupModalOpen] = useState(false);
   const [editingExerciseIndex, setEditingExerciseIndex] = useState<number | null>(null);
+
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false);
+  const [selectedExerciseCategory, setSelectedExerciseCategory] = useState<string | null>(null);
 
   const form = useForm<WorkoutFormData>({
     resolver: zodResolver(workoutFormSchema),
@@ -54,6 +64,7 @@ export default function WorkoutBuilderPage() {
         reps: userSettings.defaultReps,
         weight: '',
         muscleGroups: [],
+        notes: '',
       }],
     },
   });
@@ -65,27 +76,59 @@ export default function WorkoutBuilderPage() {
   
   useEffect(() => {
     if (fields.length === 0) {
-       append({ 
-        name: '', 
-        sets: userSettings.defaultSets, 
-        reps: userSettings.defaultReps,
-        weight: '',
-        muscleGroups: [],
-      });
+       appendNewExercise();
     }
   }, [userSettings, fields.length, append]);
 
-  const handleOpenModal = (index: number) => {
+  const appendNewExercise = () => {
+    append({ 
+      name: '', 
+      sets: userSettings.defaultSets, 
+      reps: userSettings.defaultReps,
+      weight: '',
+      muscleGroups: [],
+      notes: '',
+    });
+  }
+
+  const handleOpenMuscleGroupModal = (index: number) => {
     setEditingExerciseIndex(index);
-    setIsModalOpen(true);
+    setIsMuscleGroupModalOpen(true);
   };
 
   const handleSaveMuscleGroups = (groups: string[]) => {
     if (editingExerciseIndex !== null) {
       form.setValue(`exercises.${editingExerciseIndex}.muscleGroups`, groups);
     }
-    setIsModalOpen(false);
+    setIsMuscleGroupModalOpen(false);
     setEditingExerciseIndex(null);
+  };
+
+  const handleOpenCategoryModal = () => {
+    setIsCategoryModalOpen(true);
+  };
+
+  const handleCategorySelected = (category: string) => {
+    setSelectedExerciseCategory(category);
+    setIsCategoryModalOpen(false);
+    setIsSelectionModalOpen(true);
+  };
+
+  const handleModelExerciseSelected = (modelExercise: ModelExercise) => {
+    append({
+      name: modelExercise.name,
+      sets: userSettings.defaultSets,
+      reps: userSettings.defaultReps,
+      weight: modelExercise.defaultWeight || '',
+      muscleGroups: modelExercise.muscleGroups,
+      notes: modelExercise.description,
+    });
+    setIsSelectionModalOpen(false);
+    setSelectedExerciseCategory(null);
+    toast({
+      title: "Exercício Modelo Adicionado!",
+      description: `${modelExercise.name} foi adicionado ao seu treino.`,
+    });
   };
 
   async function onSubmit(values: WorkoutFormData) {
@@ -98,6 +141,7 @@ export default function WorkoutBuilderPage() {
         id: generateId(),
         weight: ex.weight || undefined,
         muscleGroups: ex.muscleGroups || [],
+        notes: ex.notes || undefined,
       } as Exercise)),
     };
     addWorkout(newWorkout);
@@ -114,6 +158,7 @@ export default function WorkoutBuilderPage() {
         reps: userSettings.defaultReps,
         weight: '',
         muscleGroups: [],
+        notes: '',
       }],
     });
     setIsSaving(false);
@@ -224,7 +269,7 @@ export default function WorkoutBuilderPage() {
                       />
                     </div>
                     
-                    <Button type="button" variant="outline" size="sm" onClick={() => handleOpenModal(index)}>
+                    <Button type="button" variant="outline" size="sm" onClick={() => handleOpenMuscleGroupModal(index)}>
                       <Target className="mr-2 h-4 w-4" /> Selecionar Grupos Musculares
                     </Button>
 
@@ -233,6 +278,20 @@ export default function WorkoutBuilderPage() {
                         <strong>Grupos Musculares:</strong> {form.watch(`exercises.${index}.muscleGroups`)!.join(', ')}
                       </div>
                     )}
+
+                    <FormField
+                      control={form.control}
+                      name={`exercises.${index}.notes`}
+                      render={({ field: exerciseField }) => (
+                        <FormItem>
+                          <FormLabel>Observações (Opcional)</FormLabel>
+                          <FormControl>
+                            <Textarea placeholder="ex: Focar na execução lenta, aquecer bem antes." {...exerciseField} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
                     {fields.length > 1 && (
                        <Button
@@ -248,19 +307,26 @@ export default function WorkoutBuilderPage() {
                     )}
                   </div>
                 ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => append({ 
-                    name: '', 
-                    sets: userSettings.defaultSets, 
-                    reps: userSettings.defaultReps, 
-                    weight: '',
-                    muscleGroups: [] 
-                  })}
-                >
-                  <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Exercício
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-2">
+                    <Button
+                    type="button"
+                    variant="outline"
+                    onClick={appendNewExercise}
+                    >
+                    <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Exercício
+                    </Button>
+                    <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleOpenCategoryModal}
+                    >
+                    <BookOpenCheck className="mr-2 h-4 w-4" /> Adicionar Exercício Modelo
+                    </Button>
+                </div>
+                <FormDescription className="text-xs">
+                    Exercícios modelo são sugestões e não constituem uma recomendação de treino profissional. Ajuste conforme suas necessidades.
+                </FormDescription>
+
               </CardContent>
               <CardFooter>
                 <Button type="submit" disabled={isSaving}>
@@ -273,13 +339,30 @@ export default function WorkoutBuilderPage() {
       </div>
       {editingExerciseIndex !== null && (
         <MuscleGroupSelectorModal
-          isOpen={isModalOpen}
+          isOpen={isMuscleGroupModalOpen}
           onClose={() => {
-            setIsModalOpen(false);
+            setIsMuscleGroupModalOpen(false);
             setEditingExerciseIndex(null);
           }}
           initialSelectedGroups={form.getValues(`exercises.${editingExerciseIndex}.muscleGroups`) || []}
           onSave={handleSaveMuscleGroups}
+        />
+      )}
+      <ModelExerciseCategoryModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        onSelectCategory={handleCategorySelected}
+      />
+      {selectedExerciseCategory && (
+        <ModelExerciseSelectionModal
+          isOpen={isSelectionModalOpen}
+          onClose={() => {
+            setIsSelectionModalOpen(false);
+            setSelectedExerciseCategory(null);
+          }}
+          category={selectedExerciseCategory}
+          exercises={modelExerciseData[selectedExerciseCategory] || []}
+          onSelectExercise={handleModelExerciseSelected}
         />
       )}
     </AppLayout>

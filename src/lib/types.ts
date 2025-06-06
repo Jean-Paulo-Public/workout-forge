@@ -5,9 +5,9 @@ export interface Exercise {
   reps: string; // e.g., "10-12", "AMRAP", "30s"
   weight?: string; // e.g., "50kg", "Peso Corporal", "Cardio"
   muscleGroups?: string[]; // e.g., ["Peito", "Tríceps"]
+  notes?: string; // Campo opcional para observações
   // Optional fields
   duration?: string; // e.g., "60s"
-  notes?: string;
 }
 
 export interface Workout {
@@ -40,4 +40,16 @@ export interface ScheduledWorkout {
 export interface UserSettings {
   defaultSets: number;
   defaultReps: string;
+}
+
+// Tipos para Exercícios Modelo
+export interface ModelExercise {
+  name: string;
+  muscleGroups: string[];
+  description: string; // Usado para o campo 'notes'
+  defaultWeight?: string;
+}
+
+export interface ModelExerciseCategories {
+  [category: string]: ModelExercise[];
 }

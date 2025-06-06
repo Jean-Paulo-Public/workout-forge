@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -62,6 +63,9 @@ export default function WorkoutLibraryPage() {
     if (exercise.muscleGroups && exercise.muscleGroups.length > 0) {
       display += ` (Músculos: ${exercise.muscleGroups.join(', ')})`;
     }
+    if (exercise.notes) {
+      display += ` (Obs: ${exercise.notes.substring(0, 30)}...)`;
+    }
     return display;
   };
 
@@ -104,7 +108,7 @@ export default function WorkoutLibraryPage() {
                 <CardContent className="flex-grow">
                   <h4 className="font-medium mb-1 text-sm">Exercícios:</h4>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 max-h-32 overflow-y-auto">
-                    {workout.exercises.slice(0,3).map((exercise) => ( // Show fewer exercises in card summary
+                    {workout.exercises.slice(0,3).map((exercise) => ( 
                       <li key={exercise.id} className="truncate" title={formatExerciseDisplay(exercise)}>
                         {exercise.name} ({exercise.sets}x{exercise.reps})
                         {exercise.muscleGroups && exercise.muscleGroups.length > 0 && 
@@ -164,7 +168,7 @@ export default function WorkoutLibraryPage() {
             <div className="max-h-[60vh] overflow-y-auto pr-2 space-y-3 py-4">
               <h4 className="font-semibold text-md">Exercícios:</h4>
               {selectedWorkout.exercises.map((ex, idx) => (
-                <div key={ex.id} className="text-sm border-b pb-2">
+                <div key={ex.id} className="text-sm border-b pb-2 mb-2">
                   <p className="font-medium">{idx + 1}. {ex.name}</p>
                   <p className="text-muted-foreground">Séries: {ex.sets}, Reps: {ex.reps}</p>
                   {ex.weight && <p className="text-xs text-muted-foreground">Peso: {ex.weight}</p>}
@@ -174,7 +178,7 @@ export default function WorkoutLibraryPage() {
                       {ex.muscleGroups.join(', ')}
                     </p>
                   )}
-                  {ex.notes && <p className="text-xs text-muted-foreground italic">Notas: {ex.notes}</p>}
+                  {ex.notes && <p className="text-xs text-muted-foreground italic mt-1">Obs: {ex.notes}</p>}
                 </div>
               ))}
             </div>
@@ -193,4 +197,3 @@ export default function WorkoutLibraryPage() {
     </AppLayout>
   );
 }
-
