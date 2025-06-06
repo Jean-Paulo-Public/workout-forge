@@ -21,8 +21,8 @@ export function WorkoutTemplateSelectionModal({ isOpen, onClose, onSelectTemplat
         <DialogHeader>
           <DialogTitle className="font-headline">Adicionar Treino via Modelo</DialogTitle>
           <DialogDescription>
-            Escolha um modelo de treino para adicionar rapidamente à sua biblioteca.
-            Os exercícios usarão suas configurações padrão de séries e repetições.
+            Escolha um modelo de treino para adicionar rapidamente à sua biblioteca. Os
+            exercícios usarão suas configurações padrão de séries e repetições.
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="h-[40vh] my-4">
@@ -37,7 +37,7 @@ export function WorkoutTemplateSelectionModal({ isOpen, onClose, onSelectTemplat
                   onClose(); // Close modal after selection
                 }}
               >
-                <div>
+                <div className="whitespace-normal overflow-hidden">
                   <p className="font-semibold">{workoutTemplates[categoryKey].name.replace("Treino Modelo - ", "")}</p>
                   <p className="text-xs text-muted-foreground font-normal">{workoutTemplates[categoryKey].description}</p>
                 </div>
