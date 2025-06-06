@@ -67,9 +67,9 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
           exerciseId: exercise.id,
           exerciseName: exercise.name,
           hasWarmup: exercise.hasWarmup || false,
-          isWarmupCompleted: currentPerf?.isWarmupCompleted || false,
+          isWarmupCompleted: currentPerf?.isWarmupCompleted ?? false,
           weightUsed: currentPerf?.weightUsed ?? lastUsedWeight ?? exercise.weight ?? "0",
-          isExerciseCompleted: currentPerf?.isExerciseCompleted || false,
+          isExerciseCompleted: currentPerf?.isExerciseCompleted ?? false,
           plannedWeight: exercise.weight || "0",
           lastUsedWeight: lastUsedWeight ?? "N/A",
         };
@@ -77,17 +77,20 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
       form.reset({ performances: initialPerformances });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, session, workout, form.reset, getLastUsedWeightForExercise]);
+  }, [isOpen, session, workout, getLastUsedWeightForExercise]); // form.reset removed from deps as it's stable
 
+
+  const performancesFromWatch = form.watch('performances');
 
   const allExercisesCompleted = useMemo(() => {
-    const performances = form.watch('performances');
-    if (!performances || performances.length === 0) return false;
-    return performances.every(p => {
+    if (!performancesFromWatch || performancesFromWatch.length === 0) return false;
+    if (workout && performancesFromWatch.length !== workout.exercises.length) return false;
+
+    return performancesFromWatch.every(p => {
       const warmupDone = p.hasWarmup ? p.isWarmupCompleted : true;
       return warmupDone && p.isExerciseCompleted;
     });
-  }, [form, form.watch('performances')]);
+  }, [performancesFromWatch, workout]);
 
 
   const handleFinalizeWorkout = () => {
@@ -112,21 +115,22 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
             <ScrollArea className="h-[60vh] max-h-[calc(100vh-20rem)] my-4 pr-3">
               <div className="space-y-6">
                 {fields.map((item, index) => {
+                  const currentExercisePerformance = performancesFromWatch?.[index];
                   return (
                   <div key={item.id} className="p-4 border rounded-md bg-card shadow-sm">
-                    <h3 className="font-semibold text-lg mb-3">{item.exerciseName}</h3>
+                    <h3 className="font-semibold text-lg mb-3">{currentExercisePerformance?.exerciseName || item.exerciseName}</h3>
 
-                    {item.hasWarmup && (
+                    {(currentExercisePerformance?.hasWarmup || item.hasWarmup) && (
                       <FormItem className="flex flex-row items-center space-x-2 space-y-0 mb-3">
                         <Checkbox
                           id={`warmup-${item.exerciseId}`}
                           checked={form.watch(`performances.${index}.isWarmupCompleted`)}
                           onCheckedChange={(checkedState) => {
-                            const isChecked = !!checkedState;
+                            const isChecked = checkedState === true;
                             form.setValue(`performances.${index}.isWarmupCompleted`, isChecked, { shouldDirty: true });
                             updateSessionExercisePerformance(
                               session.id,
-                              item.exerciseId,
+                              item.exerciseId, // Use item.exerciseId from RHF field array item
                               { isWarmupCompleted: isChecked }
                             );
                           }}
@@ -159,13 +163,12 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
                               {...field}
                               value={field.value ?? ""}
                               onBlur={(e) => {
-                                field.onBlur(); // Call RHF's onBlur first
+                                field.onBlur(); 
                                 const currentVal = e.target.value;
                                 const weightToSave = (currentVal === '' || currentVal === undefined || currentVal === null) ? "0" : String(currentVal);
-                                // No need to form.setValue here if {...field} handles onChange for RHF state
                                 updateSessionExercisePerformance(
                                   session.id,
-                                  item.exerciseId, // Use item.exerciseId from map
+                                  item.exerciseId, 
                                   { weightUsed: weightToSave }
                                 );
                               }}
@@ -181,7 +184,7 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
                         id={`exercise-${item.exerciseId}`}
                         checked={form.watch(`performances.${index}.isExerciseCompleted`)}
                         onCheckedChange={(checkedState) => {
-                          const isChecked = !!checkedState;
+                          const isChecked = checkedState === true;
                           form.setValue(`performances.${index}.isExerciseCompleted`, isChecked, { shouldDirty: true });
                           updateSessionExercisePerformance(
                             session.id,
@@ -220,4 +223,3 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
     </Dialog>
   );
 }
-
