@@ -26,13 +26,31 @@ export const modelExerciseData: ModelExerciseCategories = {
       muscleGroups: ["Peito", "Ombros", "Tríceps", "Abdômen"],
       description: "Mãos no chão alinhadas com os ombros, corpo reto. Desça o corpo dobrando os cotovelos até o peito quase tocar o chão e empurre de volta. Mantenha o core ativado.",
       defaultWeight: "Peso Corporal"
+    },
+    {
+      name: "Pull Over (Halter ou Barra)",
+      muscleGroups: ["Peito", "Costas", "Tríceps"],
+      description: "Deite-se transversalmente em um banco com apenas os ombros apoiados, ou longitudinalmente. Segure um halter com ambas as mãos (ou barra) acima do peito. Desça o peso para trás da cabeça em um arco, alongando o peitoral e o latíssimo. Retorne à posição inicial.",
+      defaultWeight: "Ajustável"
+    },
+    {
+      name: "Voador Máquina (Peck Deck)",
+      muscleGroups: ["Peito"],
+      description: "Sente-se na máquina com as costas apoiadas. Segure os pegadores ou apoie os antebraços nas almofadas. Junte os braços à frente do corpo, contraindo o peitoral. Retorne controladamente.",
+      defaultWeight: "Ajustável"
     }
   ],
   "Costas": [
     {
-      name: "Barra Fixa (Puxada)",
+      name: "Barra Fixa (Pegada Pronada)",
       muscleGroups: ["Costas", "Bíceps", "Antebraço"],
-      description: "Segure a barra com as mãos em pronação (palmas para frente) ou supinação (palmas para você), um pouco mais largas que os ombros. Puxe o corpo para cima até o queixo ultrapassar a barra. Desça controladamente.",
+      description: "Segure a barra com as mãos em pronação (palmas para frente), um pouco mais largas que os ombros. Puxe o corpo para cima até o queixo ultrapassar a barra. Desça controladamente.",
+      defaultWeight: "Peso Corporal"
+    },
+    {
+      name: "Barra Fixa Braço Aberto (Pegada Pronada Ampla)",
+      muscleGroups: ["Costas", "Bíceps"],
+      description: "Segure a barra com pegada pronada (palmas para frente) bem mais larga que os ombros. Puxe o corpo para cima, focando em levar o peito à barra. Desça controladamente. Enfatiza a largura das costas.",
       defaultWeight: "Peso Corporal"
     },
     {
@@ -45,6 +63,18 @@ export const modelExerciseData: ModelExerciseCategories = {
       name: "Puxada Alta (Pulley)",
       muscleGroups: ["Costas", "Bíceps"],
       description: "Sente-se no aparelho com os joelhos presos sob o suporte. Segure a barra com pegada aberta. Puxe a barra em direção ao peito, inclinando levemente o tronco para trás. Retorne controladamente.",
+      defaultWeight: "Ajustável"
+    },
+    {
+      name: "Remada Máquina Sentado (Apoio no Peito)",
+      muscleGroups: ["Costas", "Bíceps"],
+      description: "Sente-se na máquina com o peito apoiado. Segure os pegadores com a pegada desejada (neutra, pronada). Puxe os pegadores em direção ao corpo, contraindo as escápulas. Retorne controladamente.",
+      defaultWeight: "Ajustável"
+    },
+    {
+      name: "Remada Alta (Barra ou Halteres)",
+      muscleGroups: ["Ombros", "Trapézio"],
+      description: "Em pé, segure a barra (ou halteres) com pegada pronada próxima. Puxe a barra verticalmente até a altura do peito, elevando os cotovelos acima dos ombros. Desça controladamente.",
       defaultWeight: "Ajustável"
     }
   ],
@@ -62,9 +92,21 @@ export const modelExerciseData: ModelExerciseCategories = {
       defaultWeight: "Ajustável"
     },
     {
+      name: "Leg Press 90º",
+      muscleGroups: ["Pernas (Quadríceps)", "Glúteos", "Pernas (Posteriores)"],
+      description: "Posicione-se no aparelho de leg press vertical ou horizontal (conforme disponibilidade). Empurre a plataforma, mantendo o controle. Desça flexionando os joelhos a aproximadamente 90 graus ou conforme a amplitude da máquina. Evite que a lombar perca o contato com o apoio.",
+      defaultWeight: "Ajustável"
+    },
+    {
       name: "Cadeira Extensora",
       muscleGroups: ["Pernas (Quadríceps)"],
       description: "Sente-se na cadeira com os tornozelos sob o rolo. Estenda as pernas completamente, contraindo o quadríceps. Retorne controladamente.",
+      defaultWeight: "Ajustável"
+    },
+    {
+      name: "Cadeira Extensora Unilateral",
+      muscleGroups: ["Pernas (Quadríceps)"],
+      description: "Sente-se na cadeira extensora, ajustando para trabalhar uma perna de cada vez. Posicione o tornozelo sob o rolo. Estenda a perna completamente, contraindo o quadríceps. Retorne controladamente e depois troque a perna.",
       defaultWeight: "Ajustável"
     },
     {
@@ -78,6 +120,30 @@ export const modelExerciseData: ModelExerciseCategories = {
       muscleGroups: ["Pernas (Quadríceps)", "Glúteos", "Pernas (Posteriores)"],
       description: "Dê um passo à frente e flexione ambos os joelhos a 90 graus, mantendo o tronco ereto. O joelho da frente não deve ultrapassar o tornozelo. Empurre de volta à posição inicial e alterne as pernas ou faça todas as repetições de um lado antes de trocar.",
       defaultWeight: "Peso Corporal / Halteres"
+    },
+    {
+      name: "Agachamento Hack Em Pé (Máquina)",
+      muscleGroups: ["Pernas (Quadríceps)", "Glúteos"],
+      description: "Posicione-se na máquina de hack squat com os ombros sob as almofadas e os pés na plataforma. Agache flexionando os joelhos até a profundidade desejada, mantendo a coluna apoiada. Empurre de volta à posição inicial.",
+      defaultWeight: "Ajustável"
+    },
+    {
+      name: "Stiff (Barra ou Halteres)",
+      muscleGroups: ["Pernas (Posteriores)", "Glúteos", "Lombar"],
+      description: "Em pé, segure a barra (ou halteres) à frente do corpo. Com os joelhos levemente flexionados (quase retos), incline o tronco para frente a partir do quadril, mantendo a coluna reta e o peso próximo às pernas. Sinta o alongamento nos posteriores e retorne à posição ereta.",
+      defaultWeight: "Ajustável"
+    },
+    {
+      name: "Panturrilha Leg Press",
+      muscleGroups: ["Panturrilhas"],
+      description: "No aparelho de leg press, posicione as pontas dos pés na parte inferior da plataforma com os calcanhares para fora. Empurre a plataforma usando apenas a flexão plantar (movimento dos tornozelos), elevando os calcanhares. Desça controladamente.",
+      defaultWeight: "Ajustável"
+    },
+    {
+      name: "Panturrilha em Pé (Gêmeos)",
+      muscleGroups: ["Panturrilhas"],
+      description: "Em pé, com ou sem peso adicional (máquina, barra, halteres). Eleve os calcanhares o máximo possível, contraindo as panturrilhas. Desça controladamente.",
+      defaultWeight: "Ajustável / Peso Corporal"
     }
   ],
   "Glúteos": [
@@ -108,6 +174,18 @@ export const modelExerciseData: ModelExerciseCategories = {
       defaultWeight: "Ajustável"
     },
     {
+      name: "Desenvolvimento Arnold (Halteres)",
+      muscleGroups: ["Ombros", "Tríceps"],
+      description: "Sentado ou em pé, segure halteres à frente dos ombros com as palmas voltadas para você. Ao elevar os halteres, rotacione os punhos de forma que as palmas fiquem para frente no topo do movimento. Inverta a rotação ao descer.",
+      defaultWeight: "Ajustável"
+    },
+    {
+      name: "Desenvolvimento Máquina",
+      muscleGroups: ["Ombros", "Tríceps"],
+      description: "Sente-se na máquina de desenvolvimento para ombros, segurando os pegadores na altura dos ombros. Empurre para cima até os braços quase esticarem. Desça controladamente.",
+      defaultWeight: "Ajustável"
+    },
+    {
       name: "Elevação Lateral (Halteres)",
       muscleGroups: ["Ombros"],
       description: "Em pé, segure um halter em cada mão ao lado do corpo. Eleve os braços lateralmente até a altura dos ombros, mantendo os cotovelos levemente flexionados. Desça controladamente.",
@@ -128,21 +206,51 @@ export const modelExerciseData: ModelExerciseCategories = {
       defaultWeight: "Ajustável"
     },
     {
-      name: "Tríceps Testa (Barra EZ ou Halteres)",
-      muscleGroups: ["Tríceps"],
-      description: "Deitado em um banco reto, segure a barra EZ ou halteres acima da testa com os cotovelos apontando para o teto. Desça o peso em direção à testa flexionando os cotovelos. Estenda os braços de volta.",
-      defaultWeight: "Ajustável"
-    },
-    {
       name: "Rosca Alternada (Halteres)",
       muscleGroups: ["Bíceps", "Antebraço"],
       description: "Em pé ou sentado, segure um halter em cada mão ao lado do corpo com pegada neutra ou supinada. Flexione um cotovelo de cada vez, rotacionando o punho (se neutro) para supinação ao subir. Alterne os braços.",
       defaultWeight: "Ajustável"
     },
     {
+      name: "Rosca Martelo (Halteres)",
+      muscleGroups: ["Bíceps", "Antebraço"],
+      description: "Em pé ou sentado, segure halteres com pegada neutra (palmas voltadas para o corpo). Flexione os cotovelos, elevando os halteres em direção aos ombros, mantendo a pegada neutra. Desça controladamente.",
+      defaultWeight: "Ajustável"
+    },
+    {
+      name: "Tríceps Testa (Barra EZ ou Halteres)",
+      muscleGroups: ["Tríceps"],
+      description: "Deitado em um banco reto, segure a barra EZ ou halteres acima da testa com os cotovelos apontando para o teto. Desça o peso em direção à testa flexionando os cotovelos. Estenda os braços de volta.",
+      defaultWeight: "Ajustável"
+    },
+    {
       name: "Tríceps Pulley (Corda ou Barra)",
       muscleGroups: ["Tríceps"],
       description: "Em pé, de frente para o pulley alto. Segure a corda ou barra com pegada pronada ou neutra. Mantenha os cotovelos próximos ao corpo e estenda os braços para baixo. Retorne controladamente.",
+      defaultWeight: "Ajustável"
+    },
+    {
+      name: "Tríceps Francês (Halter, Barra EZ ou Barra)",
+      muscleGroups: ["Tríceps"],
+      description: "Deitado, sentado ou em pé. Segure um halter com ambas as mãos (ou barra EZ/barra) acima da cabeça. Flexione os cotovelos, descendo o peso para trás da cabeça. Estenda os braços, contraindo o tríceps. Mantenha os cotovelos relativamente estáveis.",
+      defaultWeight: "Ajustável"
+    },
+    {
+      name: "Tríceps Barra de Apoio (Mergulho)",
+      muscleGroups: ["Tríceps", "Peito", "Ombros"],
+      description: "Use barras paralelas ou um banco. Mantenha o corpo ereto para focar no tríceps, ou incline-se para frente para maior ativação do peito. Desça flexionando os cotovelos e empurre para cima.",
+      defaultWeight: "Peso Corporal / Ajustável"
+    },
+    {
+      name: "Tríceps Máquina (Extensão)",
+      muscleGroups: ["Tríceps"],
+      description: "Sente-se na máquina de extensão de tríceps, segurando os pegadores. Estenda os braços, empurrando para baixo ou para frente, dependendo da máquina. Retorne controladamente.",
+      defaultWeight: "Ajustável"
+    },
+    {
+      name: "Antebraço Barra (Rosca de Punho)",
+      muscleGroups: ["Antebraço"],
+      description: "Sentado, apoie os antebraços nas coxas ou em um banco, com os punhos para fora. Segure uma barra com pegada pronada (para flexores) ou supinada (para extensores). Flexione ou estenda os punhos, movendo apenas as mãos. Controle o movimento.",
       defaultWeight: "Ajustável"
     }
   ],
@@ -202,10 +310,23 @@ export const modelExerciseData: ModelExerciseCategories = {
       defaultWeight: "Peso Corporal"
     },
     {
-      name: "Panturrilha em Pé (Gêmeos)",
-      muscleGroups: ["Panturrilhas"],
-      description: "Em pé, com ou sem peso adicional (máquina, barra, halteres). Eleve os calcanhares o máximo possível, contraindo as panturrilhas. Desça controladamente.",
-      defaultWeight: "Ajustável / Peso Corporal"
+      name: "Cadeira de Lombar (Hiperextensão)",
+      muscleGroups: ["Lombar", "Glúteos", "Pernas (Posteriores)"],
+      description: "Posicione-se na cadeira de hiperextensão com os quadris apoiados e os tornozelos presos. Com a coluna reta, desça o tronco e retorne à posição inicial, contraindo a lombar e os glúteos. Evite hiperextender demais no topo.",
+      defaultWeight: "Peso Corporal / Anilha"
+    },
+    {
+      name: "Double Press (Halteres ou Kettlebells)",
+      muscleGroups: ["Pernas (Quadríceps)", "Glúteos", "Ombros", "Tríceps", "Core", "Costas"],
+      description: "Com um halter ou kettlebell em cada mão, comece com os pesos no chão ou em posição de hang. Faça um clean (puxada) para os ombros e, em seguida, um push press ou jerk para elevar os pesos acima da cabeça. É um movimento composto e explosivo.",
+      defaultWeight: "Ajustável"
+    },
+    {
+      name: "Alongamento (Geral)",
+      muscleGroups: ["Cardio"], // Para categorização e lógica de não aquecimento
+      description: "Realize uma série de alongamentos estáticos ou dinâmicos para os principais grupos musculares. Mantenha cada alongamento por 20-30 segundos. Pode ser feito antes ou depois do treino para melhorar a flexibilidade e auxiliar na recuperação.",
+      defaultWeight: "N/A"
     }
   ]
 };
+

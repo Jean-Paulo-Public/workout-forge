@@ -94,6 +94,22 @@ type WorkoutFormData = z.infer<typeof workoutFormSchema>;
 
 const generateId = () => crypto.randomUUID();
 
+function determineModelExerciseWarmup(exerciseDetails?: ModelExercise): boolean {
+  if (!exerciseDetails) return true; // Default to true if no details (though should not happen for model)
+
+  const nameLower = exerciseDetails.name.toLowerCase();
+  const isCardio = exerciseDetails.muscleGroups.includes('Cardio');
+  const isHIIT = nameLower.includes('hiit');
+
+  if (nameLower === 'prancha abdominal') return false;
+  if (nameLower === 'alongamento (geral)') return false;
+  if (isCardio && !isHIIT) return false;
+  // Could add more specific bodyweight/core/flexibility exercises here if needed
+
+  return true; // Default to true for other model exercises
+}
+
+
 export default function WorkoutBuilderPage() {
   const { addWorkout, updateWorkout, getWorkoutById, userSettings } = useAppContext();
   const { toast } = useToast();
@@ -206,7 +222,7 @@ export default function WorkoutBuilderPage() {
         deadline: undefined,
       });
     }
-    setTimeout(() => { isInitialLoadDoneRef.current = true; }, 100); // Increased delay slightly
+    setTimeout(() => { isInitialLoadDoneRef.current = true; }, 100);
   }, [editingWorkoutId, getWorkoutById, form, toast, router, userSettings.defaultSets, userSettings.defaultReps, updateWorkoutFrequencyAndSuggestDeadline]);
 
 
@@ -242,11 +258,10 @@ export default function WorkoutBuilderPage() {
       weight: modelExerciseDetails?.defaultWeight || '',
       muscleGroups: modelExerciseDetails?.muscleGroups || [],
       notes: modelExerciseDetails?.description || '',
-      hasWarmup: isModelExercise,
+      hasWarmup: isModelExercise ? determineModelExerciseWarmup(modelExerciseDetails) : false,
     };
 
     append(newExerciseData);
-    // Ensure RHF has processed the append before getting values
     setTimeout(() => {
         const currentExercises = form.getValues('exercises');
         updateWorkoutFrequencyAndSuggestDeadline(currentExercises);
@@ -261,7 +276,6 @@ export default function WorkoutBuilderPage() {
   const handleSaveMuscleGroups = (groups: string[]) => {
     if (editingExerciseIndex !== null) {
       form.setValue(`exercises.${editingExerciseIndex}.muscleGroups`, groups, { shouldDirty: true });
-       // Ensure RHF has processed setValue before getting values
       setTimeout(() => {
         const currentExercises = form.getValues('exercises');
         updateWorkoutFrequencyAndSuggestDeadline(currentExercises);
@@ -282,7 +296,7 @@ export default function WorkoutBuilderPage() {
   };
 
   const handleModelExerciseSelected = (modelExercise: ModelExercise) => {
-    appendNewExercise(true, modelExercise); // This will call updateWorkoutFrequencyAndSuggestDeadline
+    appendNewExercise(true, modelExercise);
     setIsSelectionModalOpen(false);
 
     if (!form.getValues('name').trim() && selectedExerciseCategory) {
@@ -604,7 +618,7 @@ export default function WorkoutBuilderPage() {
                 </div>
                 <FormDescription className="text-xs">
                     Exercícios modelo são sugestões e não constituem uma recomendação de treino profissional. Ajuste conforme suas necessidades.
-                    Séries de aquecimento em exercícios modelo são marcadas por padrão.
+                    Séries de aquecimento em exercícios modelo são marcadas por padrão, exceto para alguns exercícios específicos (ex: Cardio regular, Prancha).
                 </FormDescription>
 
               </CardContent>
@@ -648,3 +662,4 @@ export default function WorkoutBuilderPage() {
     </AppLayout>
   );
 }
+
