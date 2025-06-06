@@ -13,11 +13,10 @@ import {
   LibraryBig,
   BarChart3,
   CalendarClock,
-  Sparkles,
 } from 'lucide-react';
 
 const navItems = [
-  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/builder', label: 'Workout Builder', icon: PlusSquare },
   { href: '/library', label: 'Workout Library', icon: LibraryBig },
   { href: '/progress', label: 'Progress Tracking', icon: BarChart3 },
@@ -33,7 +32,7 @@ export function Navigation() {
         <SidebarMenuItem key={item.href}>
           <SidebarMenuButton
             asChild
-            isActive={pathname === item.href}
+            isActive={pathname === item.href || (item.href === "/dashboard" && pathname === "/")}
             tooltip={{ children: item.label, side: 'right', align: 'center' }}
           >
             <Link href={item.href}>

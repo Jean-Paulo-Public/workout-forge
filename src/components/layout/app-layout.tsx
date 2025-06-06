@@ -24,7 +24,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     <SidebarProvider defaultOpen={true}>
       <Sidebar collapsible="icon" className="border-r">
         <SidebarHeader className="p-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <Link href="/dashboard" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <Dumbbell className="h-7 w-7 text-primary" />
             <h1 className="text-xl font-headline font-semibold group-data-[collapsible=icon]:hidden">
               Workout Forge
@@ -47,7 +47,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       <SidebarInset>
         <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6 md:hidden">
             <SidebarTrigger />
-            <Link href="/" className="flex items-center gap-2 font-semibold">
+            <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
                 <Dumbbell className="h-6 w-6 text-primary" />
                 <span>Workout Forge</span>
             </Link>
