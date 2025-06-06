@@ -2,17 +2,27 @@
 
 import * as React from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
-import { DayPicker } from "react-day-picker"
+import { DayPicker, type DateFormatter } from "react-day-picker"
+import { format, Locale } from "date-fns"
+import { ptBR } from "date-fns/locale"
 
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
 
-export type CalendarProps = React.ComponentProps<typeof DayPicker>
+export type CalendarProps = React.ComponentProps<typeof DayPicker> & {
+  locale?: Locale;
+}
+
+const formatCaption: DateFormatter = (month, options) => {
+  const locale = options?.locale || ptBR;
+  return format(month, "MMMM yyyy", { locale });
+};
 
 function Calendar({
   className,
   classNames,
   showOutsideDays = true,
+  locale = ptBR,
   ...props
 }: CalendarProps) {
   return (
@@ -23,7 +33,7 @@ function Calendar({
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
         caption: "flex justify-center pt-1 relative items-center",
-        caption_label: "text-sm font-medium",
+        caption_label: "text-sm font-medium capitalize",
         nav: "space-x-1 flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
@@ -54,13 +64,15 @@ function Calendar({
         ...classNames,
       }}
       components={{
-        IconLeft: ({ className, ...props }) => (
-          <ChevronLeft className={cn("h-4 w-4", className)} {...props} />
+        IconLeft: ({ className: iconClassName, ...rest }) => (
+          <ChevronLeft className={cn("h-4 w-4", iconClassName)} {...rest} />
         ),
-        IconRight: ({ className, ...props }) => (
-          <ChevronRight className={cn("h-4 w-4", className)} {...props} />
+        IconRight: ({ className: iconClassName, ...rest }) => (
+          <ChevronRight className={cn("h-4 w-4", iconClassName)} {...rest} />
         ),
       }}
+      formatters={{ formatCaption }}
+      locale={locale}
       {...props}
     />
   )

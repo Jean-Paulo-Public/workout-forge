@@ -16,11 +16,11 @@ import {
 } from 'lucide-react';
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/builder', label: 'Workout Builder', icon: PlusSquare },
-  { href: '/library', label: 'Workout Library', icon: LibraryBig },
-  { href: '/progress', label: 'Progress Tracking', icon: BarChart3 },
-  { href: '/scheduler', label: 'Scheduler', icon: CalendarClock },
+  { href: '/dashboard', label: 'Painel', icon: LayoutDashboard },
+  { href: '/builder', label: 'Construtor de Treinos', icon: PlusSquare },
+  { href: '/library', label: 'Biblioteca de Treinos', icon: LibraryBig },
+  { href: '/progress', label: 'Acompanhamento', icon: BarChart3 },
+  { href: '/scheduler', label: 'Agendador', icon: CalendarClock },
 ];
 
 export function Navigation() {

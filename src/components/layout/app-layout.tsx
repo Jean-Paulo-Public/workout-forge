@@ -40,7 +40,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         <SidebarFooter className="p-2">
           <Button variant="ghost" className="w-full justify-start gap-2 group-data-[collapsible=icon]:justify-center">
             <UserCircle size={18} />
-            <span className="group-data-[collapsible=icon]:hidden">Profile</span>
+            <span className="group-data-[collapsible=icon]:hidden">Perfil</span>
           </Button>
         </SidebarFooter>
       </Sidebar>

@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { CalendarClock, LibraryBig, TrendingUp } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 export default function DashboardPage() {
   const { scheduledWorkouts, workouts, sessions } = useAppContext();
@@ -18,7 +19,7 @@ export default function DashboardPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold font-headline">Dashboard</h1>
+        <h1 className="text-3xl font-bold font-headline">Painel</h1>
         
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           <Card>
@@ -46,7 +47,7 @@ export default function DashboardPage() {
                 <CardContent>
                     <p className="font-semibold">{upcomingWorkout.workoutName}</p>
                     <p className="text-sm text-muted-foreground">
-                        {format(new Date(upcomingWorkout.dateTime), "PPPp")}
+                        {format(new Date(upcomingWorkout.dateTime), "PPPp", { locale: ptBR })}
                     </p>
                     <Link href="/scheduler" className="mt-2">
                         <Button variant="outline" size="sm">Ver Agenda</Button>

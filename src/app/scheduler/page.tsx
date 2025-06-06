@@ -7,9 +7,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAppContext } from '@/contexts/AppContext';
-import type { ScheduledWorkout, Workout } from '@/lib/types';
+import type { ScheduledWorkout } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { format, setHours, setMinutes, setSeconds, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { CalendarClock, Trash2, PlusCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
@@ -25,14 +26,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useSearchParams } from 'next/navigation';
 
-
 export default function SchedulerPage() {
   const { workouts, scheduledWorkouts, addScheduledWorkout, deleteScheduledWorkout } = useAppContext();
   const { toast } = useToast();
   const searchParams = useSearchParams();
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [selectedTime, setSelectedTime] = useState<string>("08:00"); // HH:mm format
+  const [selectedTime, setSelectedTime] = useState<string>("08:00");
   const [selectedWorkoutId, setSelectedWorkoutId] = useState<string | undefined>(searchParams.get('workoutId') || undefined);
   
   useEffect(() => {
@@ -42,12 +42,11 @@ export default function SchedulerPage() {
     }
   }, [searchParams]);
 
-
   const handleScheduleWorkout = () => {
     if (!selectedDate || !selectedWorkoutId) {
       toast({
-        title: "Missing Information",
-        description: "Please select a date and a workout.",
+        title: "Informação Faltando",
+        description: "Por favor, selecione uma data e um treino.",
         variant: "destructive",
       });
       return;
@@ -56,8 +55,8 @@ export default function SchedulerPage() {
     const workout = workouts.find(w => w.id === selectedWorkoutId);
     if (!workout) {
       toast({
-        title: "Workout Not Found",
-        description: "The selected workout could not be found.",
+        title: "Treino Não Encontrado",
+        description: "O treino selecionado não pôde ser encontrado.",
         variant: "destructive",
       });
       return;
@@ -73,17 +72,17 @@ export default function SchedulerPage() {
     });
 
     toast({
-      title: "Workout Scheduled!",
-      description: `${workout.name} scheduled for ${format(scheduledDateTime, "PPPp")}.`,
+      title: "Treino Agendado!",
+      description: `${workout.name} agendado para ${format(scheduledDateTime, "PPPp", { locale: ptBR })}.`,
     });
-    setSelectedWorkoutId(undefined); // Reset selected workout
+    setSelectedWorkoutId(undefined);
   };
 
   const handleDeleteScheduled = (id: string) => {
     deleteScheduledWorkout(id);
     toast({
-      title: "Schedule Removed",
-      description: "The workout has been unscheduled.",
+      title: "Agendamento Removido",
+      description: "O treino foi desagendado.",
     });
   };
 
@@ -92,12 +91,12 @@ export default function SchedulerPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold font-headline">Workout Scheduler</h1>
+        <h1 className="text-3xl font-bold font-headline">Agendador de Treinos</h1>
         
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline">Schedule a New Workout</CardTitle>
-            <CardDescription>Pick a workout, date, and time for your next session.</CardDescription>
+            <CardTitle className="font-headline">Agendar Novo Treino</CardTitle>
+            <CardDescription>Escolha um treino, data e hora para sua próxima sessão.</CardDescription>
           </CardHeader>
           <CardContent className="grid md:grid-cols-2 gap-6">
             <div className="space-y-4">
@@ -106,27 +105,28 @@ export default function SchedulerPage() {
                 selected={selectedDate}
                 onSelect={setSelectedDate}
                 className="rounded-md border self-start"
-                disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))} // Disable past dates
+                disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))}
+                locale={ptBR}
               />
             </div>
             <div className="space-y-4">
               <div>
-                <label htmlFor="workout-select" className="block text-sm font-medium mb-1">Select Workout</label>
+                <label htmlFor="workout-select" className="block text-sm font-medium mb-1">Selecionar Treino</label>
                 <Select value={selectedWorkoutId} onValueChange={setSelectedWorkoutId}>
                   <SelectTrigger id="workout-select">
-                    <SelectValue placeholder="Choose a workout" />
+                    <SelectValue placeholder="Escolha um treino" />
                   </SelectTrigger>
                   <SelectContent>
                     {workouts.length > 0 ? workouts.map((workout) => (
                       <SelectItem key={workout.id} value={workout.id}>
                         {workout.name}
                       </SelectItem>
-                    )) : <SelectItem value="no-workouts" disabled>No workouts in library</SelectItem>}
+                    )) : <SelectItem value="no-workouts" disabled>Nenhum treino na biblioteca</SelectItem>}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <label htmlFor="time-select" className="block text-sm font-medium mb-1">Select Time</label>
+                <label htmlFor="time-select" className="block text-sm font-medium mb-1">Selecionar Hora</label>
                 <Input 
                   id="time-select" 
                   type="time" 
@@ -138,7 +138,7 @@ export default function SchedulerPage() {
           </CardContent>
           <CardFooter>
             <Button onClick={handleScheduleWorkout} disabled={!selectedDate || !selectedWorkoutId || workouts.length === 0}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Schedule Workout
+              <PlusCircle className="mr-2 h-4 w-4" /> Agendar Treino
             </Button>
           </CardFooter>
         </Card>
@@ -146,12 +146,12 @@ export default function SchedulerPage() {
         <Card>
           <CardHeader>
             <CardTitle className="font-headline flex items-center gap-2">
-              <CalendarClock className="text-primary" /> Upcoming Scheduled Workouts
+              <CalendarClock className="text-primary" /> Próximos Treinos Agendados
             </CardTitle>
           </CardHeader>
           <CardContent>
             {sortedScheduledWorkouts.length === 0 ? (
-              <p className="text-muted-foreground">No workouts scheduled yet.</p>
+              <p className="text-muted-foreground">Nenhum treino agendado ainda.</p>
             ) : (
               <ul className="space-y-3">
                 {sortedScheduledWorkouts.map((sw) => (
@@ -159,26 +159,26 @@ export default function SchedulerPage() {
                     <div>
                       <p className="font-semibold">{sw.workoutName}</p>
                       <p className="text-sm text-muted-foreground">
-                        {format(parseISO(sw.dateTime), "EEE, MMM d, yyyy 'at' h:mm a")}
+                        {format(parseISO(sw.dateTime), "EEE, dd 'de' MMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
                       </p>
                     </div>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" title="Remove from schedule">
+                        <Button variant="ghost" size="icon" title="Remover do agendamento">
                             <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                          <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            This will remove "{sw.workoutName}" from your schedule. This action cannot be undone.
+                            Isso removerá "{sw.workoutName}" do seu agendamento. Esta ação não pode ser desfeita.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
                           <AlertDialogAction onClick={() => handleDeleteScheduled(sw.id)}>
-                            Remove
+                            Remover
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>

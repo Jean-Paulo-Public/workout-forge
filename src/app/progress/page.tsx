@@ -5,16 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { BarChart3, History, TrendingUp } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
-// Placeholder for chart component
 const PlaceholderChart = () => (
   <div className="w-full h-64 bg-muted rounded-md flex items-center justify-center">
     <BarChart3 className="h-16 w-16 text-muted-foreground" />
-    <p className="ml-2 text-muted-foreground">Chart Coming Soon</p>
+    <p className="ml-2 text-muted-foreground">Gráfico em Breve</p>
   </div>
 );
-
 
 export default function ProgressTrackingPage() {
   const { sessions } = useAppContext();
@@ -24,16 +23,16 @@ export default function ProgressTrackingPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold font-headline">Progress Tracking</h1>
+        <h1 className="text-3xl font-bold font-headline">Acompanhamento de Progresso</h1>
         
         <div className="grid gap-6 md:grid-cols-2">
           <Card>
             <CardHeader>
               <CardTitle className="font-headline flex items-center gap-2">
                 <TrendingUp className="text-primary" />
-                Workout Trends
+                Tendências de Treino
               </CardTitle>
-              <CardDescription>Visualize your workout frequency and volume over time.</CardDescription>
+              <CardDescription>Visualize a frequência e o volume dos seus treinos ao longo do tempo.</CardDescription>
             </CardHeader>
             <CardContent>
               <PlaceholderChart />
@@ -44,20 +43,20 @@ export default function ProgressTrackingPage() {
             <CardHeader>
               <CardTitle className="font-headline flex items-center gap-2">
                 <History className="text-primary" />
-                Workout History
+                Histórico de Treinos
               </CardTitle>
-              <CardDescription>Review your completed workout sessions.</CardDescription>
+              <CardDescription>Revise suas sessões de treino concluídas.</CardDescription>
             </CardHeader>
             <CardContent>
               {sortedSessions.length === 0 ? (
-                <p className="text-muted-foreground">No workout sessions logged yet. Start a workout from your library!</p>
+                <p className="text-muted-foreground">Nenhuma sessão de treino registrada ainda. Inicie um treino da sua biblioteca!</p>
               ) : (
                 <ScrollArea className="h-72">
                   <ul className="space-y-3">
                     {sortedSessions.map(session => (
                       <li key={session.id} className="p-3 border rounded-md bg-background hover:bg-secondary/50 transition-colors">
                         <p className="font-semibold">{session.workoutName}</p>
-                        <p className="text-sm text-muted-foreground">{format(new Date(session.date), 'PPP p')}</p>
+                        <p className="text-sm text-muted-foreground">{format(new Date(session.date), 'PPP p', { locale: ptBR })}</p>
                         {session.notes && <p className="text-xs italic mt-1 text-muted-foreground">{session.notes}</p>}
                       </li>
                     ))}
@@ -68,14 +67,13 @@ export default function ProgressTrackingPage() {
           </Card>
         </div>
 
-        {/* More detailed stats or PR tracking could go here */}
         <Card>
           <CardHeader>
-            <CardTitle className="font-headline">More Stats</CardTitle>
-            <CardDescription>Detailed exercise performance and personal records (PRs) will be available here in future updates.</CardDescription>
+            <CardTitle className="font-headline">Mais Estatísticas</CardTitle>
+            <CardDescription>Desempenho detalhado de exercícios e recordes pessoais (PRs) estarão disponíveis aqui em atualizações futuras.</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">Stay tuned for more advanced progress tracking features!</p>
+            <p className="text-muted-foreground">Fique ligado para mais funcionalidades avançadas de acompanhamento de progresso!</p>
           </CardContent>
         </Card>
 

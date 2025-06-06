@@ -21,10 +21,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { format } from 'date-fns';
 
 export default function WorkoutLibraryPage() {
-  const { workouts, deleteWorkout, addSession, getWorkoutById } = useAppContext();
+  const { workouts, deleteWorkout, addSession } = useAppContext();
   const { toast } = useToast();
   const router = useRouter();
   const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null);
@@ -32,8 +31,8 @@ export default function WorkoutLibraryPage() {
   const handleDeleteWorkout = (workoutId: string) => {
     deleteWorkout(workoutId);
     toast({
-      title: "Workout Deleted",
-      description: "The workout has been removed from your library.",
+      title: "Treino Excluído",
+      description: "O treino foi removido da sua biblioteca.",
     });
   };
 
@@ -42,13 +41,12 @@ export default function WorkoutLibraryPage() {
       workoutId: workout.id,
       workoutName: workout.name,
       date: new Date().toISOString(),
-      notes: `Started ${workout.name}.`
+      notes: `Iniciou ${workout.name}.`
     });
     toast({
-      title: "Workout Started!",
-      description: `${workout.name} has been logged as started. Track your progress!`,
+      title: "Treino Iniciado!",
+      description: `${workout.name} foi registrado como iniciado. Acompanhe seu progresso!`,
     });
-    // Potentially navigate to a live workout tracking page in future
     router.push('/progress');
   };
   
@@ -60,10 +58,10 @@ export default function WorkoutLibraryPage() {
     <AppLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold font-headline">Workout Library</h1>
+          <h1 className="text-3xl font-bold font-headline">Biblioteca de Treinos</h1>
           <Link href="/builder">
             <Button>
-              <PlusCircle className="mr-2 h-4 w-4" /> Add New Workout
+              <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Novo Treino
             </Button>
           </Link>
         </div>
@@ -71,14 +69,14 @@ export default function WorkoutLibraryPage() {
         {workouts.length === 0 ? (
           <Card className="text-center">
             <CardHeader>
-              <CardTitle className="font-headline">Your Library is Empty</CardTitle>
+              <CardTitle className="font-headline">Sua Biblioteca está Vazia</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-4">
-                Create your first workout plan using the Workout Builder.
+                Crie seu primeiro plano de treino usando o Construtor de Treinos.
               </p>
               <Link href="/builder">
-                <Button variant="outline">Go to Builder</Button>
+                <Button variant="outline">Ir para o Construtor</Button>
               </Link>
             </CardContent>
           </Card>
@@ -93,47 +91,41 @@ export default function WorkoutLibraryPage() {
                   )}
                 </CardHeader>
                 <CardContent className="flex-grow">
-                  <h4 className="font-medium mb-1 text-sm">Exercises:</h4>
+                  <h4 className="font-medium mb-1 text-sm">Exercícios:</h4>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 max-h-32 overflow-y-auto">
                     {workout.exercises.slice(0,5).map((exercise) => (
-                      <li key={exercise.id}>{exercise.name} ({exercise.sets} sets x {exercise.reps})</li>
+                      <li key={exercise.id}>{exercise.name} ({exercise.sets} séries x {exercise.reps})</li>
                     ))}
-                    {workout.exercises.length > 5 && <li>...and {workout.exercises.length - 5} more</li>}
+                    {workout.exercises.length > 5 && <li>...e mais {workout.exercises.length - 5}</li>}
                   </ul>
                 </CardContent>
                 <CardFooter className="flex flex-wrap gap-2 justify-end">
                   <Button variant="outline" size="sm" onClick={() => setSelectedWorkout(workout)}>
-                    <Eye className="mr-1 h-4 w-4" /> View
+                    <Eye className="mr-1 h-4 w-4" /> Visualizar
                   </Button>
                   <Button variant="default" size="sm" onClick={() => handleStartWorkout(workout)}>
-                    <Play className="mr-1 h-4 w-4" /> Start
+                    <Play className="mr-1 h-4 w-4" /> Iniciar
                   </Button>
                    <Button variant="secondary" size="sm" onClick={() => handleScheduleWorkout(workout)}>
-                    <CalendarPlus className="mr-1 h-4 w-4" /> Schedule
+                    <CalendarPlus className="mr-1 h-4 w-4" /> Agendar
                   </Button>
-                  {/* Edit functionality would require a form similar to builder, pre-filled. For now, it's a placeholder concept. */}
-                  {/* <Link href={`/builder?edit=${workout.id}`}>
-                    <Button variant="outline" size="icon" title="Edit Workout">
-                      <Edit3 className="h-4 w-4" />
-                    </Button>
-                  </Link> */}
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="destructive" size="icon" title="Delete Workout">
+                      <Button variant="destructive" size="icon" title="Excluir Treino">
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This action cannot be undone. This will permanently delete the workout "{workout.name}".
+                          Esta ação não pode ser desfeita. Isso excluirá permanentemente o treino "{workout.name}".
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
                         <AlertDialogAction onClick={() => handleDeleteWorkout(workout.id)}>
-                          Delete
+                          Excluir
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
@@ -155,22 +147,22 @@ export default function WorkoutLibraryPage() {
               )}
             </AlertDialogHeader>
             <div className="max-h-[60vh] overflow-y-auto pr-2 space-y-3 py-4">
-              <h4 className="font-semibold text-md">Exercises:</h4>
+              <h4 className="font-semibold text-md">Exercícios:</h4>
               {selectedWorkout.exercises.map((ex, idx) => (
                 <div key={ex.id} className="text-sm border-b pb-2">
                   <p className="font-medium">{idx + 1}. {ex.name}</p>
-                  <p className="text-muted-foreground">Sets: {ex.sets}, Reps: {ex.reps}</p>
-                  {ex.notes && <p className="text-xs text-muted-foreground italic">Notes: {ex.notes}</p>}
+                  <p className="text-muted-foreground">Séries: {ex.sets}, Reps: {ex.reps}</p>
+                  {ex.notes && <p className="text-xs text-muted-foreground italic">Notas: {ex.notes}</p>}
                 </div>
               ))}
             </div>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setSelectedWorkout(null)}>Close</AlertDialogCancel>
+              <AlertDialogCancel onClick={() => setSelectedWorkout(null)}>Fechar</AlertDialogCancel>
               <AlertDialogAction onClick={() => {
                 handleStartWorkout(selectedWorkout);
                 setSelectedWorkout(null);
               }}>
-                <Play className="mr-1 h-4 w-4" /> Start Workout
+                <Play className="mr-1 h-4 w-4" /> Iniciar Treino
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

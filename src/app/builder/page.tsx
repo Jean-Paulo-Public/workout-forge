@@ -17,16 +17,15 @@ import type { Exercise } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 
 const exerciseSchema = z.object({
-  name: z.string().min(2, "Exercise name is too short."),
-  sets: z.coerce.number().min(1, "Sets must be at least 1."),
-  reps: z.string().min(1, "Reps are required."),
-  // Optional fields can be added here, e.g., weight, duration
+  name: z.string().min(2, "O nome do exercício é muito curto."),
+  sets: z.coerce.number().min(1, "As séries devem ser pelo menos 1."),
+  reps: z.string().min(1, "As repetições são obrigatórias."),
 });
 
 const workoutFormSchema = z.object({
-  name: z.string().min(3, "Workout name must be at least 3 characters."),
+  name: z.string().min(3, "O nome do treino deve ter pelo menos 3 caracteres."),
   description: z.string().optional(),
-  exercises: z.array(exerciseSchema).min(1, "Add at least one exercise."),
+  exercises: z.array(exerciseSchema).min(1, "Adicione pelo menos um exercício."),
 });
 
 type WorkoutFormData = z.infer<typeof workoutFormSchema>;
@@ -62,8 +61,8 @@ export default function WorkoutBuilderPage() {
     };
     addWorkout(newWorkout);
     toast({
-      title: "Workout Saved!",
-      description: `${values.name} has been added to your library.`,
+      title: "Treino Salvo!",
+      description: `${values.name} foi adicionado à sua biblioteca.`,
     });
     form.reset();
     setIsSaving(false);
@@ -73,12 +72,12 @@ export default function WorkoutBuilderPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold font-headline">Workout Builder</h1>
+        <h1 className="text-3xl font-bold font-headline">Construtor de Treinos</h1>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
             <Card>
               <CardHeader>
-                <CardTitle className="font-headline">Workout Details</CardTitle>
+                <CardTitle className="font-headline">Detalhes do Treino</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <FormField
@@ -86,9 +85,9 @@ export default function WorkoutBuilderPage() {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Workout Name</FormLabel>
+                      <FormLabel>Nome do Treino</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., Full Body Strength A" {...field} />
+                        <Input placeholder="ex: Força Total A" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -99,9 +98,9 @@ export default function WorkoutBuilderPage() {
                   name="description"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Description (Optional)</FormLabel>
+                      <FormLabel>Descrição (Opcional)</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="e.g., Focus on compound movements, 60s rest." {...field} />
+                        <Textarea placeholder="ex: Foco em movimentos compostos, 60s de descanso." {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -112,21 +111,21 @@ export default function WorkoutBuilderPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="font-headline">Exercises</CardTitle>
-                <CardDescription>Add exercises to your workout plan.</CardDescription>
+                <CardTitle className="font-headline">Exercícios</CardTitle>
+                <CardDescription>Adicione exercícios ao seu plano de treino.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 {fields.map((field, index) => (
                   <div key={field.id} className="p-4 border rounded-md space-y-4 relative">
-                    <h3 className="font-medium">Exercise {index + 1}</h3>
+                    <h3 className="font-medium">Exercício {index + 1}</h3>
                     <FormField
                       control={form.control}
                       name={`exercises.${index}.name`}
                       render={({ field: exerciseField }) => (
                         <FormItem>
-                          <FormLabel>Exercise Name</FormLabel>
+                          <FormLabel>Nome do Exercício</FormLabel>
                           <FormControl>
-                            <Input placeholder="e.g., Squats" {...exerciseField} />
+                            <Input placeholder="ex: Agachamentos" {...exerciseField} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -138,9 +137,9 @@ export default function WorkoutBuilderPage() {
                         name={`exercises.${index}.sets`}
                         render={({ field: exerciseField }) => (
                           <FormItem>
-                            <FormLabel>Sets</FormLabel>
+                            <FormLabel>Séries</FormLabel>
                             <FormControl>
-                              <Input type="number" placeholder="e.g., 3" {...exerciseField} />
+                              <Input type="number" placeholder="ex: 3" {...exerciseField} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -151,9 +150,9 @@ export default function WorkoutBuilderPage() {
                         name={`exercises.${index}.reps`}
                         render={({ field: exerciseField }) => (
                           <FormItem>
-                            <FormLabel>Reps/Duration</FormLabel>
+                            <FormLabel>Reps/Duração</FormLabel>
                             <FormControl>
-                              <Input placeholder="e.g., 8-12 or 30s" {...exerciseField} />
+                              <Input placeholder="ex: 8-12 ou 30s" {...exerciseField} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -167,7 +166,7 @@ export default function WorkoutBuilderPage() {
                         size="icon"
                         onClick={() => remove(index)}
                         className="absolute top-2 right-2"
-                        aria-label="Remove exercise"
+                        aria-label="Remover exercício"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -179,12 +178,12 @@ export default function WorkoutBuilderPage() {
                   variant="outline"
                   onClick={() => append({ name: '', sets: 3, reps: '10-12' })}
                 >
-                  <PlusCircle className="mr-2 h-4 w-4" /> Add Exercise
+                  <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Exercício
                 </Button>
               </CardContent>
               <CardFooter>
                 <Button type="submit" disabled={isSaving}>
-                  <Save className="mr-2 h-4 w-4" /> {isSaving ? 'Saving...' : 'Save Workout'}
+                  <Save className="mr-2 h-4 w-4" /> {isSaving ? 'Salvando...' : 'Salvar Treino'}
                 </Button>
               </CardFooter>
             </Card>
