@@ -126,12 +126,12 @@ export default function WorkoutBuilderPage() {
 
   const isInitialLoadDoneRef = useRef(false);
 
-  const updateWorkoutFrequencyAndSuggestDeadline = useCallback((currentExercises: z.infer<typeof baseExerciseSchema>[] = []) => {
+  const updateWorkoutFrequencyAndSuggestDeadline = useCallback((passedExercises?: z.infer<typeof baseExerciseSchema>[]) => {
     let maxSuggestedFrequency = 0;
-    const exercisesToEvaluate = currentExercises.length > 0 ? currentExercises : form.getValues('exercises');
+    const exercisesToEvaluate = passedExercises || form.getValues('exercises').filter(ex => ex.name && ex.name.trim() !== '');
     
     exercisesToEvaluate.forEach(exercise => {
-      if (exercise.name.trim() !== '' && exercise.muscleGroups && exercise.muscleGroups.length > 0) {
+      if (exercise.name && exercise.name.trim() !== '' && exercise.muscleGroups && exercise.muscleGroups.length > 0) {
         exercise.muscleGroups.forEach(group => {
           if (muscleGroupSuggestedFrequencies[group] && muscleGroupSuggestedFrequencies[group] > maxSuggestedFrequency) {
             maxSuggestedFrequency = muscleGroupSuggestedFrequencies[group];
@@ -145,19 +145,21 @@ export default function WorkoutBuilderPage() {
       const currentFrequency = currentFrequencyField === '' || currentFrequencyField === undefined ? 0 : Number(currentFrequencyField); 
 
       if (currentFrequency === 0 || currentFrequency < maxSuggestedFrequency) {
-         form.setValue('repeatFrequencyDays', maxSuggestedFrequency);
-         // Se a frequência mudou E o deadline está vazio, sugira o deadline
-         if (!form.getValues('deadline')) {
-            const today = startOfToday();
-            const suggestedDeadlineDate = addDays(today, maxSuggestedFrequency);
-            form.setValue('deadline', suggestedDeadlineDate);
+         form.setValue('repeatFrequencyDays', maxSuggestedFrequency, { shouldDirty: true });
+         // Se a frequência mudou E o deadline está vazio OU o deadline atual é anterior à nova sugestão de deadline
+         const currentDeadline = form.getValues('deadline');
+         const today = startOfToday();
+         const suggestedDeadlineDateBasedOnNewFrequency = addDays(today, maxSuggestedFrequency);
+
+         if (!currentDeadline || isBefore(startOfToday(currentDeadline), suggestedDeadlineDateBasedOnNewFrequency)) {
+            form.setValue('deadline', suggestedDeadlineDateBasedOnNewFrequency, { shouldValidate: true, shouldDirty: true });
          }
       }
     }
   }, [form]);
 
   useEffect(() => {
-    isInitialLoadDoneRef.current = false; // Reset on new load or ID change
+    isInitialLoadDoneRef.current = false; 
     if (editingWorkoutId) {
       const workoutToEdit = getWorkoutById(editingWorkoutId);
       if (workoutToEdit) {
@@ -180,15 +182,17 @@ export default function WorkoutBuilderPage() {
           deadline: workoutToEdit.deadline ? parseISO(workoutToEdit.deadline) : undefined,
         });
         
+        // Garantir que a frequência e deadline sejam sugeridos se necessário ao carregar
         if (formExercises.length > 0) {
-            updateWorkoutFrequencyAndSuggestDeadline(formExercises);
+             // Timeout para garantir que o form.reset concluiu antes de tentar ler/setar valores
+            setTimeout(() => updateWorkoutFrequencyAndSuggestDeadline(formExercises), 0);
         }
       } else {
         toast({ title: "Erro", description: "Treino para edição não encontrado.", variant: "destructive" });
         router.push('/library');
       }
     } else {
-      form.reset({ // Reset para um formulário limpo se não estiver editando
+      form.reset({ 
         name: '',
         description: '',
         exercises: [{ 
@@ -205,34 +209,35 @@ export default function WorkoutBuilderPage() {
         deadline: undefined,
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    setTimeout(() => { isInitialLoadDoneRef.current = true; }, 0); // Allow initial form state to settle
-  }, [editingWorkoutId, getWorkoutById, form.reset, router, toast, userSettings.defaultSets, userSettings.defaultReps, updateWorkoutFrequencyAndSuggestDeadline]);
-  // Nota: form.reset e updateWorkoutFrequencyAndSuggestDeadline são estáveis, mas incluídos por completude. append foi removido.
+    setTimeout(() => { isInitialLoadDoneRef.current = true; }, 50); // Aumentar um pouco o tempo para garantir que o reset reflita
+  }, [editingWorkoutId, getWorkoutById, form, toast, router, userSettings.defaultSets, userSettings.defaultReps, updateWorkoutFrequencyAndSuggestDeadline]);
 
 
   const watchedRepeatFrequencyDays = form.watch('repeatFrequencyDays');
 
   useEffect(() => {
-    if (!isInitialLoadDoneRef.current) return; // Don't run on initial load after reset
+    if (!isInitialLoadDoneRef.current) return;
 
     const frequencyString = String(watchedRepeatFrequencyDays);
+    if (frequencyString === '' || frequencyString === 'undefined' || frequencyString === 'null') return; 
+    
     const frequency = parseInt(frequencyString, 10);
 
     if (!isNaN(frequency) && frequency > 0) {
-      const today = startOfToday();
-      const suggestedDeadlineDate = addDays(today, frequency);
+      const todayAnchor = startOfToday();
+      const suggestedDeadlineDate = addDays(todayAnchor, frequency);
       const currentDeadline = form.getValues('deadline');
 
       if (!currentDeadline || isBefore(startOfToday(currentDeadline), suggestedDeadlineDate) || !isEqual(startOfToday(currentDeadline), suggestedDeadlineDate)) {
         form.setValue('deadline', suggestedDeadlineDate, { shouldValidate: true, shouldDirty: true });
       }
     }
-  }, [watchedRepeatFrequencyDays, form]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedRepeatFrequencyDays]); // form e isInitialLoadDoneRef são estáveis ou controlados por refs
 
 
   const appendNewExercise = (isModelExercise = false, modelExerciseDetails?: ModelExercise) => {
-    const newExerciseData = { 
+    const newExerciseData: z.infer<typeof baseExerciseSchema> = { 
       id: generateId(),
       name: modelExerciseDetails?.name || '', 
       sets: userSettings.defaultSets, 
@@ -242,11 +247,12 @@ export default function WorkoutBuilderPage() {
       notes: modelExerciseDetails?.description || '',
       hasWarmup: isModelExercise, 
     };
-    append(newExerciseData);
     
-    // Passar a lista de exercícios atualizada explicitamente
-    const currentExercises = form.getValues('exercises'); //Pega os valores após o append
-    updateWorkoutFrequencyAndSuggestDeadline(currentExercises); 
+    const exercisesBeforeAppend = form.getValues('exercises').filter(ex => ex.name && ex.name.trim() !== '');
+    append(newExerciseData); 
+    
+    const potentialUpdatedExercisesList = [...exercisesBeforeAppend, newExerciseData];
+    updateWorkoutFrequencyAndSuggestDeadline(potentialUpdatedExercisesList); 
   };
 
   const handleOpenMuscleGroupModal = (index: number) => {
@@ -256,8 +262,13 @@ export default function WorkoutBuilderPage() {
 
   const handleSaveMuscleGroups = (groups: string[]) => {
     if (editingExerciseIndex !== null) {
-      form.setValue(`exercises.${editingExerciseIndex}.muscleGroups`, groups); 
-      updateWorkoutFrequencyAndSuggestDeadline(form.getValues('exercises'));
+      const exercisesSnapshot = form.getValues('exercises');
+      const updatedExercisesList = exercisesSnapshot.map((ex, idx) => 
+        idx === editingExerciseIndex ? { ...ex, muscleGroups: groups } : ex
+      ).filter(ex => ex.name && ex.name.trim() !== ''); // Filtra aqui também para consistência
+
+      form.setValue(`exercises.${editingExerciseIndex}.muscleGroups`, groups, { shouldDirty: true }); 
+      updateWorkoutFrequencyAndSuggestDeadline(updatedExercisesList);
     }
     setIsMuscleGroupModalOpen(false);
     setEditingExerciseIndex(null);
@@ -278,7 +289,7 @@ export default function WorkoutBuilderPage() {
     setIsSelectionModalOpen(false);
 
     if (!form.getValues('name').trim() && selectedExerciseCategory) {
-      form.setValue('name', selectedExerciseCategory);
+      form.setValue('name', selectedExerciseCategory, { shouldDirty: true });
     }
     
     setSelectedExerciseCategory(null);
@@ -322,7 +333,6 @@ export default function WorkoutBuilderPage() {
       });
     }
     
-    // Reset form for new workout entry only if not editing
     if (!editingWorkoutId) {
         form.reset({
             name: '',
@@ -341,7 +351,6 @@ export default function WorkoutBuilderPage() {
             deadline: undefined,
         });
     }
-
 
     setIsSaving(false);
     router.push('/library');
@@ -397,6 +406,7 @@ export default function WorkoutBuilderPage() {
                       </FormControl>
                       <FormDescription>
                         Define com que frequência este treino aparecerá na "Esteira de Treinos" após ser concluído ou se ainda não foi feito.
+                        Será sugerido automaticamente com base nos grupos musculares dos exercícios.
                         Ajuste os dias de descanso conforme suas necessidades. Se possível, consulte um profissional de educação física.
                       </FormDescription>
                       <FormMessage />
@@ -455,7 +465,7 @@ export default function WorkoutBuilderPage() {
                 <CardDescription>Adicione exercícios ao seu plano de treino. Exercícios com nome não preenchido serão ignorados ao salvar.</CardDescription>
                  <FormField
                   control={form.control}
-                  name="exercises"
+                  name="exercises" 
                   render={() => ( 
                     <FormItem>
                        <FormMessage />
@@ -641,3 +651,6 @@ export default function WorkoutBuilderPage() {
     </AppLayout>
   );
 }
+
+
+    
