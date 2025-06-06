@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Trash2, Save, Target, BookOpenCheck, CalendarIcon, CalendarDays } from 'lucide-react';
+import { PlusCircle, Trash2, Save, Target, BookOpenCheck, CalendarIcon } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import type { Exercise, ModelExercise, Workout } from '@/lib/types';
@@ -25,7 +25,7 @@ import { modelExerciseData } from '@/lib/model-exercises';
 import { muscleGroupSuggestedFrequencies } from '@/lib/muscle-group-frequencies';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, addDays, startOfToday, isBefore, isEqual } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
@@ -124,7 +124,9 @@ export default function WorkoutBuilderPage() {
     name: 'exercises',
   });
 
-  const updateWorkoutFrequencyBasedOnExercises = useCallback((currentExercises: z.infer<typeof baseExerciseSchema>[] = []) => {
+  const isInitialLoadDoneRef = useRef(false);
+
+  const updateWorkoutFrequencyAndSuggestDeadline = useCallback((currentExercises: z.infer<typeof baseExerciseSchema>[] = []) => {
     let maxSuggestedFrequency = 0;
     const exercisesToEvaluate = currentExercises.length > 0 ? currentExercises : form.getValues('exercises');
     
@@ -140,15 +142,22 @@ export default function WorkoutBuilderPage() {
 
     if (maxSuggestedFrequency > 0) {
       const currentFrequencyField = form.getValues('repeatFrequencyDays');
-      const currentFrequency = currentFrequencyField === '' ? 0 : Number(currentFrequencyField); 
+      const currentFrequency = currentFrequencyField === '' || currentFrequencyField === undefined ? 0 : Number(currentFrequencyField); 
 
       if (currentFrequency === 0 || currentFrequency < maxSuggestedFrequency) {
          form.setValue('repeatFrequencyDays', maxSuggestedFrequency);
+         // Se a frequência mudou E o deadline está vazio, sugira o deadline
+         if (!form.getValues('deadline')) {
+            const today = startOfToday();
+            const suggestedDeadlineDate = addDays(today, maxSuggestedFrequency);
+            form.setValue('deadline', suggestedDeadlineDate);
+         }
       }
     }
   }, [form]);
 
   useEffect(() => {
+    isInitialLoadDoneRef.current = false; // Reset on new load or ID change
     if (editingWorkoutId) {
       const workoutToEdit = getWorkoutById(editingWorkoutId);
       if (workoutToEdit) {
@@ -172,15 +181,17 @@ export default function WorkoutBuilderPage() {
         });
         
         if (formExercises.length > 0) {
-            updateWorkoutFrequencyBasedOnExercises(formExercises);
+            updateWorkoutFrequencyAndSuggestDeadline(formExercises);
         }
       } else {
         toast({ title: "Erro", description: "Treino para edição não encontrado.", variant: "destructive" });
         router.push('/library');
       }
     } else {
-      if (form.getValues('exercises').length === 0) {
-        append({ 
+      form.reset({ // Reset para um formulário limpo se não estiver editando
+        name: '',
+        description: '',
+        exercises: [{ 
           id: generateId(),
           name: '', 
           sets: userSettings.defaultSets, 
@@ -189,10 +200,35 @@ export default function WorkoutBuilderPage() {
           muscleGroups: [],
           notes: '',
           hasWarmup: false,
-        });
+        }],
+        repeatFrequencyDays: undefined,
+        deadline: undefined,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setTimeout(() => { isInitialLoadDoneRef.current = true; }, 0); // Allow initial form state to settle
+  }, [editingWorkoutId, getWorkoutById, form.reset, router, toast, userSettings.defaultSets, userSettings.defaultReps, updateWorkoutFrequencyAndSuggestDeadline]);
+  // Nota: form.reset e updateWorkoutFrequencyAndSuggestDeadline são estáveis, mas incluídos por completude. append foi removido.
+
+
+  const watchedRepeatFrequencyDays = form.watch('repeatFrequencyDays');
+
+  useEffect(() => {
+    if (!isInitialLoadDoneRef.current) return; // Don't run on initial load after reset
+
+    const frequencyString = String(watchedRepeatFrequencyDays);
+    const frequency = parseInt(frequencyString, 10);
+
+    if (!isNaN(frequency) && frequency > 0) {
+      const today = startOfToday();
+      const suggestedDeadlineDate = addDays(today, frequency);
+      const currentDeadline = form.getValues('deadline');
+
+      if (!currentDeadline || isBefore(startOfToday(currentDeadline), suggestedDeadlineDate) || !isEqual(startOfToday(currentDeadline), suggestedDeadlineDate)) {
+        form.setValue('deadline', suggestedDeadlineDate, { shouldValidate: true, shouldDirty: true });
       }
     }
-  }, [editingWorkoutId, getWorkoutById, form, router, toast, userSettings.defaultSets, userSettings.defaultReps, append, updateWorkoutFrequencyBasedOnExercises]);
+  }, [watchedRepeatFrequencyDays, form]);
 
 
   const appendNewExercise = (isModelExercise = false, modelExerciseDetails?: ModelExercise) => {
@@ -208,8 +244,9 @@ export default function WorkoutBuilderPage() {
     };
     append(newExerciseData);
     
-    const currentExercises = [...form.getValues('exercises')]; 
-    updateWorkoutFrequencyBasedOnExercises(currentExercises); 
+    // Passar a lista de exercícios atualizada explicitamente
+    const currentExercises = form.getValues('exercises'); //Pega os valores após o append
+    updateWorkoutFrequencyAndSuggestDeadline(currentExercises); 
   };
 
   const handleOpenMuscleGroupModal = (index: number) => {
@@ -220,7 +257,7 @@ export default function WorkoutBuilderPage() {
   const handleSaveMuscleGroups = (groups: string[]) => {
     if (editingExerciseIndex !== null) {
       form.setValue(`exercises.${editingExerciseIndex}.muscleGroups`, groups); 
-      updateWorkoutFrequencyBasedOnExercises(form.getValues('exercises'));
+      updateWorkoutFrequencyAndSuggestDeadline(form.getValues('exercises'));
     }
     setIsMuscleGroupModalOpen(false);
     setEditingExerciseIndex(null);
@@ -285,26 +322,26 @@ export default function WorkoutBuilderPage() {
       });
     }
     
-    form.reset({
-      name: '',
-      description: '',
-      exercises: [], 
-      repeatFrequencyDays: undefined,
-      deadline: undefined,
-    });
-    
-     if (!editingWorkoutId) { 
-        append({ 
-            id: generateId(),
-            name: '', 
-            sets: userSettings.defaultSets, 
-            reps: userSettings.defaultReps,
-            weight: '',
-            muscleGroups: [],
-            notes: '',
-            hasWarmup: false,
+    // Reset form for new workout entry only if not editing
+    if (!editingWorkoutId) {
+        form.reset({
+            name: '',
+            description: '',
+            exercises: [{ 
+                id: generateId(),
+                name: '', 
+                sets: userSettings.defaultSets, 
+                reps: userSettings.defaultReps,
+                weight: '',
+                muscleGroups: [],
+                notes: '',
+                hasWarmup: false,
+            }],
+            repeatFrequencyDays: undefined,
+            deadline: undefined,
         });
     }
+
 
     setIsSaving(false);
     router.push('/library');
@@ -360,7 +397,7 @@ export default function WorkoutBuilderPage() {
                       </FormControl>
                       <FormDescription>
                         Define com que frequência este treino aparecerá na "Esteira de Treinos" após ser concluído ou se ainda não foi feito.
-                        Lembre-se de ajustar os dias de descanso conforme suas necessidades e, se possível, consulte um profissional de educação física.
+                        Ajuste os dias de descanso conforme suas necessidades. Se possível, consulte um profissional de educação física.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -396,14 +433,14 @@ export default function WorkoutBuilderPage() {
                             mode="single"
                             selected={field.value}
                             onSelect={field.onChange}
-                            disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() -1)) } // Permite selecionar hoje
+                            disabled={(date) => isBefore(date, startOfToday()) && !isEqual(date, startOfToday()) } 
                             initialFocus
                             locale={ptBR}
                           />
                         </PopoverContent>
                       </Popover>
                       <FormDescription>
-                        Defina uma data limite para este treino aparecer destacado na esteira.
+                        Defina uma data limite para este treino aparecer destacado na esteira. Será sugerido automaticamente se "Repetir a cada (dias)" for preenchido.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
