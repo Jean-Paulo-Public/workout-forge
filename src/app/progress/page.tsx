@@ -11,7 +11,7 @@ import { ptBR } from 'date-fns/locale';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useCallback } from 'react';
-import type { Workout, WorkoutSession } from '@/lib/types';
+import type { Workout, WorkoutSession, SessionExercisePerformance } from '@/lib/types';
 import { DeadlineUpdateModal } from '@/components/DeadlineUpdateModal';
 import { TrackWorkoutModal } from '@/components/TrackWorkoutModal';
 
@@ -26,7 +26,7 @@ export default function ProgressTrackingPage() {
   const { sessions, getWorkoutById, updateWorkout, markGlobalWarmupAsCompleted } = useAppContext();
   const { toast } = useToast();
   const [workoutToUpdateDeadline, setWorkoutToUpdateDeadline] = useState<Workout | null>(null);
-  
+
   const [trackingSession, setTrackingSession] = useState<WorkoutSession | null>(null);
   const [isTrackModalOpen, setIsTrackModalOpen] = useState(false);
 
@@ -51,14 +51,14 @@ export default function ProgressTrackingPage() {
     if (trackingSession) {
         const workout = getWorkoutById(trackingSession.workoutId);
         if (workout && workout.repeatFrequencyDays && workout.repeatFrequencyDays > 0) {
-            setWorkoutToUpdateDeadline(workout); 
+            setWorkoutToUpdateDeadline(workout);
         }
         toast({
             title: "Treino Finalizado!",
             description: `A sessão de ${trackingSession.workoutName} foi marcada como concluída e sua performance registrada.`,
         });
     }
-    setTrackingSession(null); 
+    setTrackingSession(null);
   }, [trackingSession, getWorkoutById, toast]);
 
 
@@ -109,19 +109,22 @@ export default function ProgressTrackingPage() {
                   <ul className="space-y-3">
                     {sortedSessions.map(session => {
                       const workoutDetails = getWorkoutById(session.workoutId);
-                      const needsGlobalWarmup = workoutDetails?.hasGlobalWarmup && !session.isGlobalWarmupCompleted;
+                      const isWorkoutDeleted = !workoutDetails;
+                      const displayName = isWorkoutDeleted ? `${session.workoutName} (Excluído)` : session.workoutName;
+                      
+                      const needsGlobalWarmup = !isWorkoutDeleted && workoutDetails?.hasGlobalWarmup && !session.isGlobalWarmupCompleted;
 
                       return (
                       <li key={session.id} className="p-3 border rounded-md bg-card hover:bg-muted/10 transition-colors">
                         <div className="flex justify-between items-start">
                           <div>
-                            <p className="font-semibold">{session.workoutName}</p>
+                            <p className="font-semibold">{displayName}</p>
                             <p className="text-sm text-muted-foreground">
                               Iniciado em: {format(new Date(session.date), 'PPP p', { locale: ptBR })}
                             </p>
                             {session.notes && <p className="text-xs italic mt-1 text-muted-foreground">{session.notes}</p>}
                           </div>
-                          {!session.isCompleted ? (
+                          {!session.isCompleted && !isWorkoutDeleted ? (
                             needsGlobalWarmup ? (
                                <Button
                                   size="sm"
@@ -142,9 +145,11 @@ export default function ProgressTrackingPage() {
                                 </Button>
                             )
                           ) : (
-                            <span className="text-xs text-green-600 font-medium flex items-center">
-                              <CheckCircle2 className="mr-1 h-4 w-4" /> Concluído
-                            </span>
+                            session.isCompleted && (
+                              <span className="text-xs text-green-600 font-medium flex items-center">
+                                <CheckCircle2 className="mr-1 h-4 w-4" /> Concluído
+                              </span>
+                            )
                           )}
                         </div>
                         {session.isCompleted && session.exercisePerformances && session.exercisePerformances.length > 0 && (
@@ -204,3 +209,4 @@ export default function ProgressTrackingPage() {
     </AppLayout>
   );
 }
+
