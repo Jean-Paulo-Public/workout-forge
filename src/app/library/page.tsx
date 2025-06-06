@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -57,10 +58,10 @@ export default function WorkoutLibraryPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold font-headline">Biblioteca de Treinos</h1>
-          <Link href="/builder">
-            <Button>
+        <div className="flex flex-col items-start gap-y-3 sm:flex-row sm:justify-between sm:items-center">
+          <h1 className="text-2xl sm:text-3xl font-bold font-headline">Treinos</h1>
+          <Link href="/builder" className="w-full sm:w-auto">
+            <Button className="w-full sm:w-auto">
               <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Novo Treino
             </Button>
           </Link>
