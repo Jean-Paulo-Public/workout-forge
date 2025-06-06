@@ -13,7 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import type { Workout, WorkoutSession, SessionExercisePerformance } from '@/lib/types';
 import { useAppContext } from '@/contexts/AppContext';
-import { Flame, CheckCircle2, Save, Undo2, Dumbbell, Activity } from 'lucide-react';
+import { Flame, CheckCircle2, Save, Undo2, Dumbbell } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 const exercisePerformanceSchema = z.object({
@@ -76,7 +76,7 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
       form.reset({ performances: initialPerformances });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, session, workout, getLastUsedWeightForExercise]);
+  }, [isOpen, session, workout, getLastUsedWeightForExercise, form.reset]);
 
 
   const performancesFromWatch = form.watch('performances');
@@ -89,38 +89,38 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
 
 
   const handleMarkWarmupCompleted = (index: number) => {
-    const currentPerf = performancesFromWatch[index];
-    if (currentPerf) {
-      const updatedPerf = { ...currentPerf, isWarmupCompleted: true };
-      update(index, updatedPerf);
-      updateSessionExercisePerformance(session.id, currentPerf.exerciseId, { isWarmupCompleted: true });
+    const currentPerfField = form.getValues(`performances.${index}`);
+    if (currentPerfField) {
+      const updatedPerfData = { ...currentPerfField, isWarmupCompleted: true };
+      update(index, updatedPerfData);
+      updateSessionExercisePerformance(session.id, currentPerfField.exerciseId, { isWarmupCompleted: true });
     }
   };
 
   const handleMarkExerciseCompleted = (index: number) => {
-    const currentPerf = performancesFromWatch[index];
-    if (currentPerf) {
-      const updatedPerf = { ...currentPerf, isExerciseCompleted: true };
-      update(index, updatedPerf);
-      updateSessionExercisePerformance(session.id, currentPerf.exerciseId, { isExerciseCompleted: true });
+    const currentPerfField = form.getValues(`performances.${index}`);
+    if (currentPerfField) {
+      const updatedPerfData = { ...currentPerfField, isExerciseCompleted: true };
+      update(index, updatedPerfData);
+      updateSessionExercisePerformance(session.id, currentPerfField.exerciseId, { isExerciseCompleted: true });
     }
   };
 
   const handleUndoAction = (index: number) => {
-    const currentPerf = performancesFromWatch[index];
-    if (currentPerf) {
-      let updates: Partial<SessionExercisePerformance> = {};
-      let updatedPerfData = { ...currentPerf };
+    const currentPerfField = form.getValues(`performances.${index}`);
+    if (currentPerfField) {
+      let updatesToPersist: Partial<SessionExercisePerformance> = {};
+      let updatedPerfData = { ...currentPerfField };
 
-      if (currentPerf.isExerciseCompleted) {
-        updates.isExerciseCompleted = false;
+      if (currentPerfField.isExerciseCompleted) {
+        updatesToPersist.isExerciseCompleted = false;
         updatedPerfData.isExerciseCompleted = false;
-      } else if (currentPerf.hasWarmup && currentPerf.isWarmupCompleted) {
-        updates.isWarmupCompleted = false;
+      } else if (currentPerfField.hasWarmup && currentPerfField.isWarmupCompleted) {
+        updatesToPersist.isWarmupCompleted = false;
         updatedPerfData.isWarmupCompleted = false;
       }
       update(index, updatedPerfData);
-      updateSessionExercisePerformance(session.id, currentPerf.exerciseId, updates);
+      updateSessionExercisePerformance(session.id, currentPerfField.exerciseId, updatesToPersist);
     }
   };
 
@@ -145,16 +145,13 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
           <form>
             <ScrollArea className="h-[60vh] max-h-[calc(100vh-20rem)] my-4 pr-3">
               <div className="space-y-6">
-                {fields.map((item, index) => {
-                  const currentPerf = performancesFromWatch?.[index];
-                  if (!currentPerf) return null;
-
-                  const canUndo = currentPerf.isExerciseCompleted || (currentPerf.hasWarmup && currentPerf.isWarmupCompleted);
+                {fields.map((item, index) => { // 'item' is the field object from useFieldArray
+                  const canUndo = item.isExerciseCompleted || (item.hasWarmup && item.isWarmupCompleted);
 
                   let statusBadge: JSX.Element;
-                  if (currentPerf.isExerciseCompleted) {
-                    statusBadge = <Badge variant="default" className="bg-green-600 hover:bg-green-700"><CheckCircle2 className="mr-1 h-3 w-3" />Concluído</Badge>;
-                  } else if (currentPerf.hasWarmup && !currentPerf.isWarmupCompleted) {
+                  if (item.isExerciseCompleted) {
+                    statusBadge = <Badge variant="default" className="bg-green-600 hover:bg-green-700 text-primary-foreground"><CheckCircle2 className="mr-1 h-3 w-3" />Concluído</Badge>;
+                  } else if (item.hasWarmup && !item.isWarmupCompleted) {
                     statusBadge = <Badge variant="secondary" className="bg-orange-500 hover:bg-orange-600 text-white"><Flame className="mr-1 h-3 w-3" />Aquecimento Pendente</Badge>;
                   } else {
                     statusBadge = <Badge variant="outline"><Dumbbell className="mr-1 h-3 w-3" />Exercício Pendente</Badge>;
@@ -163,16 +160,16 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
                   return (
                   <div key={item.id} className="p-4 border rounded-md bg-card shadow-sm">
                     <div className="flex justify-between items-center mb-3">
-                        <h3 className="font-semibold text-lg">{currentPerf.exerciseName}</h3>
+                        <h3 className="font-semibold text-lg">{item.exerciseName}</h3>
                         {statusBadge}
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 mb-3">
                         <p className="text-sm text-muted-foreground">
-                            Planejado: <span className="font-medium text-foreground">{currentPerf.plannedWeight || "N/A"}</span>
+                            Planejado: <span className="font-medium text-foreground">{item.plannedWeight || "N/A"}</span>
                         </p>
                         <p className="text-sm text-muted-foreground">
-                            Último Usado: <span className="font-medium text-foreground">{currentPerf.lastUsedWeight || "N/A"}</span>
+                            Último Usado: <span className="font-medium text-foreground">{item.lastUsedWeight || "N/A"}</span>
                         </p>
                     </div>
 
@@ -193,11 +190,11 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
                                 const weightToSave = (currentVal === '' || currentVal === undefined || currentVal === null) ? "0" : String(currentVal);
                                 updateSessionExercisePerformance(
                                   session.id,
-                                  currentPerf.exerciseId,
+                                  item.exerciseId, // Use item.exerciseId from the field array item
                                   { weightUsed: weightToSave }
                                 );
                               }}
-                              disabled={currentPerf.isExerciseCompleted}
+                              disabled={item.isExerciseCompleted}
                             />
                           </FormControl>
                           <FormMessage />
@@ -206,12 +203,12 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
                     />
 
                     <div className="mt-4 flex flex-wrap gap-2 justify-start">
-                        {currentPerf.hasWarmup && !currentPerf.isWarmupCompleted && !currentPerf.isExerciseCompleted && (
+                        {item.hasWarmup && !item.isWarmupCompleted && !item.isExerciseCompleted && (
                             <Button type="button" size="sm" variant="outline" onClick={() => handleMarkWarmupCompleted(index)}>
                                 <Flame className="mr-2 h-4 w-4 text-orange-500" /> Concluir Aquecimento
                             </Button>
                         )}
-                        {((currentPerf.hasWarmup && currentPerf.isWarmupCompleted) || !currentPerf.hasWarmup) && !currentPerf.isExerciseCompleted && (
+                        {((item.hasWarmup && item.isWarmupCompleted) || !item.hasWarmup) && !item.isExerciseCompleted && (
                             <Button type="button" size="sm" onClick={() => handleMarkExerciseCompleted(index)}>
                                 <CheckCircle2 className="mr-2 h-4 w-4" /> Concluir Exercício
                             </Button>
@@ -247,5 +244,3 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
     </Dialog>
   );
 }
-
-    
