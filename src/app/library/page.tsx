@@ -24,9 +24,10 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Badge } from "@/components/ui/badge";
 
 export default function WorkoutLibraryPage() {
-  const { workouts, deleteWorkout, addSession, getWorkoutById } = useAppContext();
+  const { workouts, deleteWorkout, addSession, getWorkoutById, hasActiveSession } = useAppContext();
   const { toast } = useToast();
   const router = useRouter();
   const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null);
@@ -40,6 +41,15 @@ export default function WorkoutLibraryPage() {
   };
 
   const handleStartWorkout = (workoutToStart: Workout) => {
+    if (hasActiveSession(workoutToStart.id)) {
+      toast({
+        title: "Treino Já Ativo",
+        description: `O treino "${workoutToStart.name}" já possui uma sessão em andamento. Finalize-a antes de iniciar uma nova.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
     const currentWorkoutDetails = getWorkoutById(workoutToStart.id);
     if (!currentWorkoutDetails) {
       toast({
@@ -61,7 +71,7 @@ export default function WorkoutLibraryPage() {
     });
     router.push('/progress');
   };
-  
+
   const handleEditWorkout = (workoutId: string) => {
     router.push(`/builder?editId=${workoutId}`);
   };
@@ -111,10 +121,15 @@ export default function WorkoutLibraryPage() {
           </Card>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {workouts.map((workout) => (
+            {workouts.map((workout) => {
+              const isActive = hasActiveSession(workout.id);
+              return (
               <Card key={workout.id} className="flex flex-col">
                 <CardHeader>
-                  <CardTitle className="font-headline">{workout.name}</CardTitle>
+                  <div className="flex justify-between items-start">
+                    <CardTitle className="font-headline">{workout.name}</CardTitle>
+                    {isActive && <Badge variant="destructive" className="text-xs ml-2">ATIVO</Badge>}
+                  </div>
                   {workout.description && (
                     <CardDescription>{workout.description}</CardDescription>
                   )}
@@ -132,11 +147,11 @@ export default function WorkoutLibraryPage() {
                 <CardContent className="flex-grow">
                   <h4 className="font-medium mb-1 text-sm">Exercícios:</h4>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 max-h-32 overflow-y-auto">
-                    {workout.exercises.slice(0,3).map((exercise) => ( 
+                    {workout.exercises.slice(0,3).map((exercise) => (
                       <li key={exercise.id} className="truncate" title={formatExerciseDisplay(exercise)}>
                         {exercise.hasWarmup && <Flame className="inline h-3 w-3 mr-1 text-orange-500" />}
                         {exercise.name} ({exercise.sets}x{exercise.reps})
-                        {exercise.muscleGroups && exercise.muscleGroups.length > 0 && 
+                        {exercise.muscleGroups && exercise.muscleGroups.length > 0 &&
                           <span className="text-xs ml-1">({exercise.muscleGroups.slice(0,2).join(', ')}{exercise.muscleGroups.length > 2 ? '...' : ''})</span>}
                       </li>
                     ))}
@@ -150,8 +165,14 @@ export default function WorkoutLibraryPage() {
                   <Button variant="secondary" size="sm" onClick={() => handleEditWorkout(workout.id)}>
                     <Edit className="mr-1 h-4 w-4" /> Editar
                   </Button>
-                  <Button variant="default" size="sm" onClick={() => handleStartWorkout(workout)}>
-                    <Play className="mr-1 h-4 w-4" /> Iniciar
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => handleStartWorkout(workout)}
+                    disabled={isActive}
+                    title={isActive ? "Este treino já está em andamento" : "Iniciar treino"}
+                  >
+                    <Play className="mr-1 h-4 w-4" /> {isActive ? "Em Andamento" : "Iniciar"}
                   </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
@@ -176,7 +197,7 @@ export default function WorkoutLibraryPage() {
                   </AlertDialog>
                 </CardFooter>
               </Card>
-            ))}
+            )})}
           </div>
         )}
       </div>
@@ -185,7 +206,10 @@ export default function WorkoutLibraryPage() {
         <AlertDialog open={!!selectedWorkout} onOpenChange={() => setSelectedWorkout(null)}>
           <AlertDialogContent className="max-w-lg">
             <AlertDialogHeader>
-              <AlertDialogTitle className="font-headline">{selectedWorkout.name}</AlertDialogTitle>
+               <div className="flex justify-between items-start">
+                <AlertDialogTitle className="font-headline">{selectedWorkout.name}</AlertDialogTitle>
+                {hasActiveSession(selectedWorkout.id) && <Badge variant="destructive" className="text-xs mt-1 ml-2">ATIVO</Badge>}
+              </div>
               {selectedWorkout.description && (
                 <AlertDialogDescription>{selectedWorkout.description}</AlertDialogDescription>
               )}
@@ -212,7 +236,7 @@ export default function WorkoutLibraryPage() {
                   {ex.weight && <p className="text-xs text-muted-foreground">Peso: {ex.weight}</p>}
                   {ex.muscleGroups && ex.muscleGroups.length > 0 && (
                     <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                      <Target className="h-3 w-3" /> 
+                      <Target className="h-3 w-3" />
                       {ex.muscleGroups.join(', ')}
                     </p>
                   )}
@@ -222,11 +246,15 @@ export default function WorkoutLibraryPage() {
             </div>
             <AlertDialogFooter>
               <AlertDialogCancel onClick={() => setSelectedWorkout(null)}>Fechar</AlertDialogCancel>
-              <AlertDialogAction onClick={() => {
-                handleStartWorkout(selectedWorkout);
-                setSelectedWorkout(null);
-              }}>
-                <Play className="mr-1 h-4 w-4" /> Iniciar Treino
+              <AlertDialogAction
+                onClick={() => {
+                  handleStartWorkout(selectedWorkout);
+                  setSelectedWorkout(null);
+                }}
+                disabled={hasActiveSession(selectedWorkout.id)}
+                title={hasActiveSession(selectedWorkout.id) ? "Este treino já está em andamento" : "Iniciar treino"}
+              >
+                <Play className="mr-1 h-4 w-4" /> {hasActiveSession(selectedWorkout.id) ? "Em Andamento" : "Iniciar Treino"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

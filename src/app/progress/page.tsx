@@ -4,7 +4,7 @@
 import { AppLayout } from '@/components/layout/app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { BarChart3, History, TrendingUp, CheckCircle2 } from 'lucide-react';
+import { BarChart3, History, TrendingUp, CheckCircle2, Flame } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -23,7 +23,7 @@ const PlaceholderChart = () => (
 );
 
 export default function ProgressTrackingPage() {
-  const { sessions, completeSession, getWorkoutById, updateWorkout, workouts } = useAppContext();
+  const { sessions, completeSession, getWorkoutById, updateWorkout, markWarmupAsCompleted } = useAppContext();
   const { toast } = useToast();
   const [workoutToUpdateDeadline, setWorkoutToUpdateDeadline] = useState<Workout | null>(null);
 
@@ -41,7 +41,17 @@ export default function ProgressTrackingPage() {
       setWorkoutToUpdateDeadline(workout);
     }
   };
-  
+
+  const handleMarkWarmupCompleted = (sessionId: string, workoutId: string) => {
+    const workout = getWorkoutById(workoutId);
+    const firstExerciseName = workout?.exercises[0]?.name;
+    markWarmupAsCompleted(sessionId, firstExerciseName);
+    toast({
+      title: "Aquecimento Concluído!",
+      description: `Aquecimento para ${firstExerciseName || 'o treino'} finalizado. Continue com o treino principal!`,
+    });
+  };
+
   const handleDeadlineSave = (updatedWorkoutId: string, newDeadline?: Date) => {
     const workoutToUpdate = getWorkoutById(updatedWorkoutId);
     if (workoutToUpdate) {
@@ -59,7 +69,7 @@ export default function ProgressTrackingPage() {
     <AppLayout>
       <div className="space-y-6">
         <h1 className="text-3xl font-bold font-headline">Acompanhamento de Progresso</h1>
-        
+
         <div className="grid gap-6 md:grid-cols-2">
           <Card>
             <CardHeader>
@@ -88,7 +98,12 @@ export default function ProgressTrackingPage() {
               ) : (
                 <ScrollArea className="h-72">
                   <ul className="space-y-3">
-                    {sortedSessions.map(session => (
+                    {sortedSessions.map(session => {
+                      const workoutDetails = getWorkoutById(session.workoutId);
+                      const firstExerciseHasWarmup = workoutDetails?.exercises[0]?.hasWarmup === true;
+                      const isWarmupPhaseActive = firstExerciseHasWarmup && !session.warmupCompleted;
+
+                      return (
                       <li key={session.id} className="p-3 border rounded-md bg-background hover:bg-secondary/50 transition-colors">
                         <div className="flex justify-between items-start">
                           <div>
@@ -99,14 +114,25 @@ export default function ProgressTrackingPage() {
                             {session.notes && <p className="text-xs italic mt-1 text-muted-foreground">{session.notes}</p>}
                           </div>
                           {!session.isCompleted ? (
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              onClick={() => handleCompleteSession(session.id, session.workoutId, session.workoutName)}
-                              className="whitespace-nowrap"
-                            >
-                              <CheckCircle2 className="mr-2 h-4 w-4 text-green-500" /> Finalizar
-                            </Button>
+                            isWarmupPhaseActive ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleMarkWarmupCompleted(session.id, session.workoutId)}
+                                className="whitespace-nowrap"
+                              >
+                                <Flame className="mr-2 h-4 w-4 text-orange-500" /> Concluir Aquecimento
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="default"
+                                onClick={() => handleCompleteSession(session.id, session.workoutId, session.workoutName)}
+                                className="whitespace-nowrap"
+                              >
+                                <CheckCircle2 className="mr-2 h-4 w-4 text-primary-foreground" /> Finalizar Treino
+                              </Button>
+                            )
                           ) : (
                             <span className="text-xs text-green-600 font-medium flex items-center">
                               <CheckCircle2 className="mr-1 h-4 w-4" /> Concluído
@@ -114,7 +140,7 @@ export default function ProgressTrackingPage() {
                           )}
                         </div>
                       </li>
-                    ))}
+                    )})}
                   </ul>
                 </ScrollArea>
               )}
@@ -144,4 +170,3 @@ export default function ProgressTrackingPage() {
     </AppLayout>
   );
 }
-

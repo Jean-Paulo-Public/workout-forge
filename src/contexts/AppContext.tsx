@@ -13,8 +13,10 @@ interface AppContextType {
   getWorkoutById: (workoutId: string) => Workout | undefined;
 
   sessions: WorkoutSession[];
-  addSession: (session: Omit<WorkoutSession, 'id' | 'isCompleted'>) => void;
+  addSession: (session: Omit<WorkoutSession, 'id' | 'isCompleted' | 'warmupCompleted' | 'notes'>) => void;
   completeSession: (sessionId: string) => void;
+  markWarmupAsCompleted: (sessionId: string, firstExerciseName?: string) => void;
+  hasActiveSession: (workoutId: string) => boolean;
 
   userSettings: UserSettings;
   updateUserSettings: (settings: Partial<UserSettings>) => void;
@@ -26,7 +28,7 @@ const generateId = () => crypto.randomUUID();
 
 const DEFAULT_USER_SETTINGS: UserSettings = {
   defaultSets: 3,
-  defaultReps: '8', 
+  defaultReps: '8',
 };
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -39,10 +41,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setIsMounted(true);
     const storedWorkouts = localStorage.getItem('workouts');
     if (storedWorkouts) setWorkouts(JSON.parse(storedWorkouts));
-    
+
     const storedSessions = localStorage.getItem('sessions');
     if (storedSessions) setSessions(JSON.parse(storedSessions));
-        
+
     const storedUserSettings = localStorage.getItem('userSettings');
     if (storedUserSettings) {
       setUserSettingsState(JSON.parse(storedUserSettings));
@@ -58,17 +60,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (isMounted) localStorage.setItem('sessions', JSON.stringify(sessions));
   }, [sessions, isMounted]);
-  
+
   useEffect(() => {
     if (isMounted) localStorage.setItem('userSettings', JSON.stringify(userSettings));
   }, [userSettings, isMounted]);
 
   const addWorkout = (workoutData: Omit<Workout, 'id'>) => {
-    const newWorkout: Workout = { 
-      ...workoutData, 
+    const newWorkout: Workout = {
+      ...workoutData,
       id: generateId(),
       exercises: workoutData.exercises.map(ex => ({
-        ...ex, 
+        ...ex,
         id: generateId(),
         hasWarmup: ex.hasWarmup || false,
       })),
@@ -86,7 +88,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         deadline: updatedWorkout.deadline || undefined,
         exercises: updatedWorkout.exercises.map(ex => ({
           ...ex,
-          id: ex.id || generateId(), 
+          id: ex.id || generateId(),
           hasWarmup: ex.hasWarmup || false,
         }))
       } : w))
@@ -96,32 +98,59 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteWorkout = (workoutId: string) => {
     setWorkouts((prev) => prev.filter((w) => w.id !== workoutId));
   };
-  
+
   const getWorkoutById = (workoutId: string): Workout | undefined => {
     return workouts.find(w => w.id === workoutId);
   };
 
-  const addSession = (sessionData: Omit<WorkoutSession, 'id' | 'isCompleted'>) => {
+  const hasActiveSession = (workoutId: string): boolean => {
+    return sessions.some(s => s.workoutId === workoutId && !s.isCompleted);
+  };
+
+  const addSession = (sessionData: Omit<WorkoutSession, 'id' | 'isCompleted' | 'warmupCompleted' | 'notes'>) => {
     const workout = getWorkoutById(sessionData.workoutId);
     let sessionNotes = `Iniciou ${sessionData.workoutName}.`;
+    let initialWarmupCompleted = false;
 
     if (workout && workout.exercises.length > 0 && workout.exercises[0].hasWarmup) {
       sessionNotes = `Iniciando aquecimento para ${workout.exercises[0].name}. Treino: ${sessionData.workoutName}.`;
+      initialWarmupCompleted = false; // Explicitly false as warm-up needs to be completed
+    } else {
+      // If no warm-up for the first exercise, or no exercises, consider warm-up phase "completed" or not applicable.
+      initialWarmupCompleted = true;
     }
 
-    const newSession: WorkoutSession = { 
-      ...sessionData, 
-      id: generateId(), 
+    const newSession: WorkoutSession = {
+      ...sessionData,
+      id: generateId(),
       isCompleted: false,
       notes: sessionNotes,
+      warmupCompleted: initialWarmupCompleted,
     };
     setSessions((prev) => [newSession, ...prev]);
   };
 
+  const markWarmupAsCompleted = (sessionId: string, firstExerciseName?: string) => {
+    setSessions(prev =>
+      prev.map(session => {
+        if (session.id === sessionId) {
+          let updatedNotes = session.notes;
+          if (firstExerciseName) {
+            updatedNotes = `Aquecimento para ${firstExerciseName} concluído. Iniciando treino principal de ${session.workoutName}.`;
+          } else {
+            updatedNotes = `Aquecimento concluído. Iniciando treino principal de ${session.workoutName}.`;
+          }
+          return { ...session, warmupCompleted: true, notes: updatedNotes };
+        }
+        return session;
+      })
+    );
+  };
+
   const completeSession = (sessionId: string) => {
-    setSessions(prev => 
-      prev.map(session => 
-        session.id === sessionId ? { ...session, isCompleted: true } : session
+    setSessions(prev =>
+      prev.map(session =>
+        session.id === sessionId ? { ...session, isCompleted: true, notes: `${session.notes || ''} Treino finalizado.` } : session
       )
     );
   };
@@ -139,11 +168,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     sessions,
     addSession,
     completeSession,
+    markWarmupAsCompleted,
+    hasActiveSession,
     userSettings,
     updateUserSettings,
   };
 
-  if (!isMounted) return null; 
+  if (!isMounted) return null;
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

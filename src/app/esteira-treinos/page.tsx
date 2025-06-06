@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format, differenceInDays, addDays, parseISO, isBefore, startOfToday, isEqual, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 
 interface WorkoutWithStatus extends Workout {
@@ -32,7 +33,7 @@ interface DeadlineDisplayInfo {
 function getDeadlineDisplayInfo(workout: WorkoutWithStatus): DeadlineDisplayInfo {
   const baseCardClasses = "flex flex-col";
   const baseDeadlineTextColor = "text-muted-foreground";
-  
+
   let info: DeadlineDisplayInfo = {
     statusText: "",
     cardClasses: baseCardClasses,
@@ -65,34 +66,34 @@ function getDeadlineDisplayInfo(workout: WorkoutWithStatus): DeadlineDisplayInfo
 
 
 export default function TrainingMatPage() {
-  const { workouts, sessions, addSession, getWorkoutById } = useAppContext();
+  const { workouts, sessions, addSession, getWorkoutById, hasActiveSession } = useAppContext();
   const router = useRouter();
   const { toast } = useToast();
   const [displayableWorkouts, setDisplayableWorkouts] = useState<WorkoutWithStatus[]>([]);
 
   useEffect(() => {
-    const todayAtStart = startOfToday(); // Represents 00:00:00 of the current local day
+    const todayAtStart = startOfToday();
 
     const availableWorkouts = workouts.filter(workout => {
       const completedSessionsForThisWorkout = sessions.filter(s => s.workoutId === workout.id && s.isCompleted);
 
       if ((workout.repeatFrequencyDays && workout.repeatFrequencyDays > 0) && completedSessionsForThisWorkout.length === 0) {
-        return true; 
+        return true;
       }
       if (workout.deadline && completedSessionsForThisWorkout.length === 0) {
-         return true; 
+         return true;
       }
 
       if (!workout.repeatFrequencyDays || workout.repeatFrequencyDays <= 0) {
-        return false; 
+        return false;
       }
-      
+
       const completedSessionsSorted = sessions
         .filter(s => s.workoutId === workout.id && s.isCompleted)
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      
-      if (completedSessionsSorted.length === 0) { 
-        return true; // Should have been caught by the first rule if frequency is set
+
+      if (completedSessionsSorted.length === 0) {
+        return true;
       }
 
       const lastCompletionDate = startOfToday(parseISO(completedSessionsSorted[0].date));
@@ -107,15 +108,9 @@ export default function TrainingMatPage() {
       let isTodayDeadline = false;
 
       if (workout.deadline) {
-        // workout.deadline is an ISO string from Date.toISOString(), originally from a local midnight Date.
-        // parseISO will correctly create a Date object representing that local midnight.
-        const deadlineDate = parseISO(workout.deadline); 
-        
-        // isBefore compares deadlineDate (local midnight) with todayAtStart (local midnight)
+        const deadlineDate = parseISO(workout.deadline);
         isOverdue = isBefore(deadlineDate, todayAtStart);
-        // differenceInDays compares deadlineDate (local midnight) with todayAtStart (local midnight)
-        daysUntilDeadline = differenceInDays(deadlineDate, todayAtStart); 
-        // isToday checks if deadlineDate (local midnight) falls on the current local day.
+        daysUntilDeadline = differenceInDays(deadlineDate, todayAtStart);
         isTodayDeadline = isToday(deadlineDate);
       }
       return { ...workout, isOverdue, daysUntilDeadline, isTodayDeadline };
@@ -125,12 +120,12 @@ export default function TrainingMatPage() {
       if (a.isOverdue && !b.isOverdue) return -1;
       if (!a.isOverdue && b.isOverdue) return 1;
       if (a.isOverdue && b.isOverdue) {
-        return (a.daysUntilDeadline ?? -Infinity) - (b.daysUntilDeadline ?? -Infinity); 
+        return (a.daysUntilDeadline ?? -Infinity) - (b.daysUntilDeadline ?? -Infinity);
       }
 
       if (a.isTodayDeadline && !b.isTodayDeadline) return -1;
       if (!a.isTodayDeadline && b.isTodayDeadline) return 1;
-      if (a.isTodayDeadline && b.isTodayDeadline) { 
+      if (a.isTodayDeadline && b.isTodayDeadline) {
         return a.name.localeCompare(b.name);
       }
 
@@ -138,10 +133,10 @@ export default function TrainingMatPage() {
       const bIsTomorrow = !b.isOverdue && !b.isTodayDeadline && b.daysUntilDeadline === 1;
       if (aIsTomorrow && !bIsTomorrow) return -1;
       if (!aIsTomorrow && bIsTomorrow) return 1;
-      if (aIsTomorrow && bIsTomorrow) { 
+      if (aIsTomorrow && bIsTomorrow) {
          return a.name.localeCompare(b.name);
       }
-      
+
       if (a.daysUntilDeadline !== undefined && b.daysUntilDeadline === undefined) return -1;
       if (a.daysUntilDeadline === undefined && b.daysUntilDeadline !== undefined) return 1;
       if (a.daysUntilDeadline !== undefined && b.daysUntilDeadline !== undefined) {
@@ -150,7 +145,7 @@ export default function TrainingMatPage() {
         }
         return a.daysUntilDeadline - b.daysUntilDeadline;
       }
-      
+
       return a.name.localeCompare(b.name);
     });
 
@@ -159,6 +154,15 @@ export default function TrainingMatPage() {
   }, [workouts, sessions]);
 
   const handleStartWorkout = (workoutToStart: Workout) => {
+     if (hasActiveSession(workoutToStart.id)) {
+      toast({
+        title: "Treino Já Ativo",
+        description: `O treino "${workoutToStart.name}" já possui uma sessão em andamento. Finalize-a antes de iniciar uma nova.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
     const currentWorkoutDetails = getWorkoutById(workoutToStart.id);
     if (!currentWorkoutDetails) {
       toast({
@@ -212,16 +216,20 @@ export default function TrainingMatPage() {
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {displayableWorkouts.map((workout) => {
               const displayInfo = getDeadlineDisplayInfo(workout);
+              const isActive = hasActiveSession(workout.id);
               return (
                 <Card
                   key={workout.id}
                   className={displayInfo.cardClasses}
                 >
                   <CardHeader>
-                    <CardTitle className="font-headline flex items-center justify-between">
-                      {workout.name}
-                      {displayInfo.alertIcon}
-                    </CardTitle>
+                    <div className="flex justify-between items-start">
+                        <CardTitle className="font-headline flex items-center gap-2">
+                         {workout.name}
+                         {displayInfo.alertIcon}
+                        </CardTitle>
+                        {isActive && <Badge variant="destructive" className="text-xs ml-2">ATIVO</Badge>}
+                    </div>
                     {workout.description && (
                       <CardDescription>{workout.description}</CardDescription>
                     )}
@@ -251,8 +259,14 @@ export default function TrainingMatPage() {
                     </ul>
                   </CardContent>
                   <CardFooter className="flex flex-wrap gap-2 justify-end">
-                    <Button variant="default" size="sm" onClick={() => handleStartWorkout(workout)}>
-                      <Play className="mr-1 h-4 w-4" /> Iniciar Agora
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => handleStartWorkout(workout)}
+                      disabled={isActive}
+                      title={isActive ? "Este treino já está em andamento" : "Iniciar treino"}
+                    >
+                      <Play className="mr-1 h-4 w-4" /> {isActive ? "Em Andamento" : "Iniciar Agora"}
                     </Button>
                   </CardFooter>
                 </Card>

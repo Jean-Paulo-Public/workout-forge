@@ -17,7 +17,7 @@ export interface Workout {
   name: string;
   description?: string;
   exercises: Exercise[];
-  repeatFrequencyDays?: number; 
+  repeatFrequencyDays?: number;
   deadline?: string; // ISO Date string for deadline (opcional)
 }
 
@@ -28,6 +28,7 @@ export interface WorkoutSession {
   date: string; // ISO Date string (start date)
   isCompleted: boolean;
   notes?: string;
+  warmupCompleted?: boolean; // Indica se a fase de aquecimento (se houver) foi concluída
 }
 
 export interface UserSettings {
