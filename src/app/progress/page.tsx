@@ -1,3 +1,4 @@
+
 "use client";
 
 import { AppLayout } from '@/components/layout/app-layout';
@@ -9,6 +10,10 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
+import type { Workout } from '@/lib/types';
+import { DeadlineUpdateModal } from '@/components/DeadlineUpdateModal';
+
 
 const PlaceholderChart = () => (
   <div className="w-full h-64 bg-muted rounded-md flex items-center justify-center">
@@ -18,18 +23,37 @@ const PlaceholderChart = () => (
 );
 
 export default function ProgressTrackingPage() {
-  const { sessions, completeSession } = useAppContext();
+  const { sessions, completeSession, getWorkoutById, updateWorkout, workouts } = useAppContext();
   const { toast } = useToast();
+  const [workoutToUpdateDeadline, setWorkoutToUpdateDeadline] = useState<Workout | null>(null);
 
   const sortedSessions = [...sessions].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  const handleCompleteSession = (sessionId: string, workoutName: string) => {
+  const handleCompleteSession = (sessionId: string, workoutId: string, workoutName: string) => {
     completeSession(sessionId);
     toast({
       title: "Treino Finalizado!",
       description: `A sessão de ${workoutName} foi marcada como concluída.`,
     });
+
+    const workout = getWorkoutById(workoutId);
+    if (workout && workout.repeatFrequencyDays && workout.repeatFrequencyDays > 0) {
+      setWorkoutToUpdateDeadline(workout);
+    }
   };
+  
+  const handleDeadlineSave = (updatedWorkoutId: string, newDeadline?: Date) => {
+    const workoutToUpdate = getWorkoutById(updatedWorkoutId);
+    if (workoutToUpdate) {
+      updateWorkout({ ...workoutToUpdate, deadline: newDeadline ? newDeadline.toISOString() : undefined });
+      toast({
+        title: "Deadline Atualizado!",
+        description: `O deadline para ${workoutToUpdate.name} foi ${newDeadline ? 'definido' : 'removido'}.`,
+      });
+    }
+    setWorkoutToUpdateDeadline(null);
+  };
+
 
   return (
     <AppLayout>
@@ -78,7 +102,7 @@ export default function ProgressTrackingPage() {
                             <Button 
                               size="sm" 
                               variant="outline" 
-                              onClick={() => handleCompleteSession(session.id, session.workoutName)}
+                              onClick={() => handleCompleteSession(session.id, session.workoutId, session.workoutName)}
                               className="whitespace-nowrap"
                             >
                               <CheckCircle2 className="mr-2 h-4 w-4 text-green-500" /> Finalizar
@@ -109,6 +133,15 @@ export default function ProgressTrackingPage() {
         </Card>
 
       </div>
+      {workoutToUpdateDeadline && (
+        <DeadlineUpdateModal
+          isOpen={!!workoutToUpdateDeadline}
+          onClose={() => setWorkoutToUpdateDeadline(null)}
+          workout={workoutToUpdateDeadline}
+          onSave={handleDeadlineSave}
+        />
+      )}
     </AppLayout>
   );
 }
+

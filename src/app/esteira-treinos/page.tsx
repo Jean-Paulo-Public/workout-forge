@@ -56,8 +56,10 @@ export default function TrainingMatPage() {
       if (workout.deadline) {
         const deadlineDate = startOfToday(parseISO(workout.deadline));
         isOverdue = isBefore(deadlineDate, today);
-        if (!isOverdue) {
+        if (!isOverdue && !isEqual(deadlineDate, today)) { // Consider today as not "until deadline"
           daysUntilDeadline = differenceInDays(deadlineDate, today);
+        } else if (isEqual(deadlineDate, today)) {
+            daysUntilDeadline = 0; // Deadline is today
         }
       }
       return { ...workout, isOverdue, daysUntilDeadline };
@@ -68,14 +70,17 @@ export default function TrainingMatPage() {
       // 1. Overdue workouts first, sorted by oldest deadline
       if (a.isOverdue && !b.isOverdue) return -1;
       if (!a.isOverdue && b.isOverdue) return 1;
-      if (a.isOverdue && b.isOverdue) {
-        return differenceInDays(parseISO(a.deadline!), parseISO(b.deadline!));
+      if (a.isOverdue && b.isOverdue && a.deadline && b.deadline) {
+        return differenceInDays(parseISO(a.deadline), parseISO(b.deadline));
       }
 
-      // 2. Workouts with upcoming deadlines, sorted by closest deadline
+      // 2. Workouts with upcoming deadlines (today or future), sorted by closest deadline
       if (a.daysUntilDeadline !== undefined && b.daysUntilDeadline === undefined) return -1;
       if (a.daysUntilDeadline === undefined && b.daysUntilDeadline !== undefined) return 1;
       if (a.daysUntilDeadline !== undefined && b.daysUntilDeadline !== undefined) {
+        if (a.daysUntilDeadline === b.daysUntilDeadline) { // If same deadline day, sort by name
+          return a.name.localeCompare(b.name);
+        }
         return a.daysUntilDeadline - b.daysUntilDeadline;
       }
       
@@ -140,16 +145,16 @@ export default function TrainingMatPage() {
               <Card 
                 key={workout.id} 
                 className={cn("flex flex-col", {
-                  "border-orange-500 ring-2 ring-orange-500/50": workout.isOverdue,
-                  "border-yellow-500": !workout.isOverdue && workout.daysUntilDeadline !== undefined && workout.daysUntilDeadline <= 2, // Highlight if deadline is within 2 days
+                  "border-red-500 ring-2 ring-red-500/50": workout.isOverdue,
+                  "border-yellow-500": !workout.isOverdue && workout.daysUntilDeadline !== undefined && workout.daysUntilDeadline <= 2,
                 })}
               >
                 <CardHeader>
                   <CardTitle className="font-headline flex items-center justify-between">
                     {workout.name}
-                    {workout.isOverdue && <AlertTriangle className="h-5 w-5 text-orange-500" title="Deadline Vencido!" />}
+                    {workout.isOverdue && <AlertTriangle className="h-5 w-5 text-red-500" title="Deadline Vencido!" />}
                     {!workout.isOverdue && workout.daysUntilDeadline !== undefined && workout.daysUntilDeadline <= 2 && (
-                       <AlertTriangle className="h-5 w-5 text-yellow-500" title={`Deadline em ${workout.daysUntilDeadline +1} dia(s)!`} />
+                       <AlertTriangle className="h-5 w-5 text-yellow-500" title={`Deadline em ${workout.daysUntilDeadline === 0 ? 'Hoje!' : `${workout.daysUntilDeadline} dia(s)!`}`} />
                     )}
                   </CardTitle>
                   {workout.description && (
@@ -162,10 +167,15 @@ export default function TrainingMatPage() {
                       </CardDescription>
                     )}
                     {workout.deadline && (
-                       <CardDescription className={cn("text-xs flex items-center", workout.isOverdue ? "text-orange-600 font-medium" : "text-muted-foreground")}>
+                       <CardDescription className={cn("text-xs flex items-center", 
+                         workout.isOverdue ? "text-red-600 font-medium" : 
+                         (!workout.isOverdue && workout.daysUntilDeadline !== undefined && workout.daysUntilDeadline <= 2 ? "text-yellow-600 font-medium" : "text-muted-foreground")
+                       )}>
                          <CalendarDays className="h-3 w-3 mr-1" /> Deadline: {format(parseISO(workout.deadline), "dd/MM/yyyy", { locale: ptBR })}
                           {workout.isOverdue && " (Vencido)"}
-                          {!workout.isOverdue && workout.daysUntilDeadline !== undefined && ` (em ${workout.daysUntilDeadline +1} dia(s))`}
+                          {!workout.isOverdue && workout.daysUntilDeadline !== undefined && (
+                            workout.daysUntilDeadline === 0 ? " (Hoje!)" : ` (em ${workout.daysUntilDeadline} dia${workout.daysUntilDeadline === 1 ? '' : 's'})`
+                          )}
                        </CardDescription>
                     )}
                   </div>
