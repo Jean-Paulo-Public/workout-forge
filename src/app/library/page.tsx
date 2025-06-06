@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAppContext } from '@/contexts/AppContext';
 import type { Workout, Exercise } from '@/lib/types';
-import { PlusCircle, Trash2, Play, Eye, CalendarPlus, Target } from 'lucide-react';
+import { PlusCircle, Trash2, Play, Eye, CalendarPlus, Target, Flame } from 'lucide-react';
 import Link from 'next/link';
 import {
   AlertDialog,
@@ -24,7 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 
 export default function WorkoutLibraryPage() {
-  const { workouts, deleteWorkout, addSession } = useAppContext();
+  const { workouts, deleteWorkout, addSession, getWorkoutById } = useAppContext();
   const { toast } = useToast();
   const router = useRouter();
   const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null);
@@ -37,16 +37,27 @@ export default function WorkoutLibraryPage() {
     });
   };
 
-  const handleStartWorkout = (workout: Workout) => {
+  const handleStartWorkout = (workoutToStart: Workout) => {
+    // Make sure we have the latest workout data, especially for exercises and hasWarmup
+    const currentWorkoutDetails = getWorkoutById(workoutToStart.id);
+    if (!currentWorkoutDetails) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível encontrar os detalhes do treino para iniciá-lo.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     addSession({
-      workoutId: workout.id,
-      workoutName: workout.name,
+      workoutId: currentWorkoutDetails.id,
+      workoutName: currentWorkoutDetails.name,
       date: new Date().toISOString(),
-      notes: `Iniciou ${workout.name}.`
+      // Notes will be set within addSession based on warmup status of the first exercise
     });
     toast({
       title: "Treino Iniciado!",
-      description: `${workout.name} foi registrado como iniciado. Acompanhe seu progresso!`,
+      description: `${currentWorkoutDetails.name} foi registrado. Acompanhe seu progresso!`,
     });
     router.push('/progress');
   };
@@ -62,6 +73,9 @@ export default function WorkoutLibraryPage() {
     }
     if (exercise.muscleGroups && exercise.muscleGroups.length > 0) {
       display += ` (Músculos: ${exercise.muscleGroups.join(', ')})`;
+    }
+     if (exercise.hasWarmup) {
+      display += ` (Aquecimento incluído)`;
     }
     if (exercise.notes) {
       display += ` (Obs: ${exercise.notes.substring(0, 30)}...)`;
@@ -110,6 +124,7 @@ export default function WorkoutLibraryPage() {
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 max-h-32 overflow-y-auto">
                     {workout.exercises.slice(0,3).map((exercise) => ( 
                       <li key={exercise.id} className="truncate" title={formatExerciseDisplay(exercise)}>
+                        {exercise.hasWarmup && <Flame className="inline h-3 w-3 mr-1 text-orange-500" />}
                         {exercise.name} ({exercise.sets}x{exercise.reps})
                         {exercise.muscleGroups && exercise.muscleGroups.length > 0 && 
                           <span className="text-xs ml-1">({exercise.muscleGroups.slice(0,2).join(', ')}{exercise.muscleGroups.length > 2 ? '...' : ''})</span>}
@@ -169,7 +184,10 @@ export default function WorkoutLibraryPage() {
               <h4 className="font-semibold text-md">Exercícios:</h4>
               {selectedWorkout.exercises.map((ex, idx) => (
                 <div key={ex.id} className="text-sm border-b pb-2 mb-2">
-                  <p className="font-medium">{idx + 1}. {ex.name}</p>
+                  <p className="font-medium">
+                    {ex.hasWarmup && <Flame className="inline h-4 w-4 mr-1 text-orange-500" title="Série de aquecimento incluída" />}
+                    {idx + 1}. {ex.name}
+                  </p>
                   <p className="text-muted-foreground">Séries: {ex.sets}, Reps: {ex.reps}</p>
                   {ex.weight && <p className="text-xs text-muted-foreground">Peso: {ex.weight}</p>}
                   {ex.muscleGroups && ex.muscleGroups.length > 0 && (

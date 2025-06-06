@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { ReactNode } from 'react';
@@ -30,7 +31,7 @@ const generateId = () => crypto.randomUUID();
 
 const DEFAULT_USER_SETTINGS: UserSettings = {
   defaultSets: 3,
-  defaultReps: '10-12',
+  defaultReps: '8', // Alterado de '10-12' para '8'
 };
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -79,7 +80,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const newWorkout: Workout = { 
       ...workoutData, 
       id: generateId(),
-      exercises: workoutData.exercises.map(ex => ({...ex, id: generateId()}))
+      exercises: workoutData.exercises.map(ex => ({
+        ...ex, 
+        id: generateId(),
+        hasWarmup: ex.hasWarmup || false, // Garante que hasWarmup esteja presente
+      }))
     };
     setWorkouts((prev) => [...prev, newWorkout]);
   };
@@ -99,8 +104,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const addSession = (sessionData: Omit<WorkoutSession, 'id' | 'isCompleted'>) => {
-    const newSession: WorkoutSession = { ...sessionData, id: generateId(), isCompleted: false };
-    setSessions((prev) => [newSession, ...prev]); // Add to the beginning of the list
+    const workout = getWorkoutById(sessionData.workoutId);
+    let sessionNotes = `Iniciou ${sessionData.workoutName}.`;
+
+    if (workout && workout.exercises.length > 0 && workout.exercises[0].hasWarmup) {
+      sessionNotes = `Iniciando aquecimento para ${workout.exercises[0].name}. Treino: ${sessionData.workoutName}.`;
+    }
+
+    const newSession: WorkoutSession = { 
+      ...sessionData, 
+      id: generateId(), 
+      isCompleted: false,
+      notes: sessionNotes,
+    };
+    setSessions((prev) => [newSession, ...prev]);
   };
 
   const completeSession = (sessionId: string) => {

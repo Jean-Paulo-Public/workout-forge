@@ -1,3 +1,4 @@
+
 export interface Exercise {
   id: string;
   name: string;
@@ -6,6 +7,7 @@ export interface Exercise {
   weight?: string; // e.g., "50kg", "Peso Corporal", "Cardio"
   muscleGroups?: string[]; // e.g., ["Peito", "Tríceps"]
   notes?: string; // Campo opcional para observações
+  hasWarmup?: boolean; // Novo campo para série de aquecimento
   // Optional fields
   duration?: string; // e.g., "60s"
 }

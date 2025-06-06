@@ -11,6 +11,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { PlusCircle, Trash2, Save, Target, BookOpenCheck } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { useToast } from '@/hooks/use-toast';
@@ -28,6 +30,7 @@ const exerciseSchema = z.object({
   weight: z.string().optional(),
   muscleGroups: z.array(z.string()).optional(),
   notes: z.string().optional(),
+  hasWarmup: z.boolean().optional(),
 });
 
 const workoutFormSchema = z.object({
@@ -65,6 +68,7 @@ export default function WorkoutBuilderPage() {
         weight: '',
         muscleGroups: [],
         notes: '',
+        hasWarmup: false,
       }],
     },
   });
@@ -80,7 +84,7 @@ export default function WorkoutBuilderPage() {
     }
   }, [userSettings, fields.length, append]);
 
-  const appendNewExercise = () => {
+  const appendNewExercise = (isModelExercise = false) => {
     append({ 
       name: '', 
       sets: userSettings.defaultSets, 
@@ -88,6 +92,7 @@ export default function WorkoutBuilderPage() {
       weight: '',
       muscleGroups: [],
       notes: '',
+      hasWarmup: isModelExercise, // true if model, false if manual
     });
   }
 
@@ -122,6 +127,7 @@ export default function WorkoutBuilderPage() {
       weight: modelExercise.defaultWeight || '',
       muscleGroups: modelExercise.muscleGroups,
       notes: modelExercise.description,
+      hasWarmup: true, // Model exercises always have warmup
     });
     setIsSelectionModalOpen(false);
     setSelectedExerciseCategory(null);
@@ -142,6 +148,7 @@ export default function WorkoutBuilderPage() {
         weight: ex.weight || undefined,
         muscleGroups: ex.muscleGroups || [],
         notes: ex.notes || undefined,
+        hasWarmup: ex.hasWarmup || false,
       } as Exercise)),
     };
     addWorkout(newWorkout);
@@ -159,6 +166,7 @@ export default function WorkoutBuilderPage() {
         weight: '',
         muscleGroups: [],
         notes: '',
+        hasWarmup: false,
       }],
     });
     setIsSaving(false);
@@ -278,6 +286,25 @@ export default function WorkoutBuilderPage() {
                         <strong>Grupos Musculares:</strong> {form.watch(`exercises.${index}.muscleGroups`)!.join(', ')}
                       </div>
                     )}
+                    
+                    <FormField
+                      control={form.control}
+                      name={`exercises.${index}.hasWarmup`}
+                      render={({ field: exerciseField }) => (
+                        <FormItem className="flex flex-row items-center space-x-2 space-y-0 mt-2">
+                           <FormControl>
+                            <Checkbox
+                              checked={exerciseField.value}
+                              onCheckedChange={exerciseField.onChange}
+                              id={`hasWarmup-${index}`}
+                            />
+                          </FormControl>
+                          <Label htmlFor={`hasWarmup-${index}`} className="font-normal cursor-pointer">
+                            Incluir série de aquecimento?
+                          </Label>
+                        </FormItem>
+                      )}
+                    />
 
                     <FormField
                       control={form.control}
@@ -311,7 +338,7 @@ export default function WorkoutBuilderPage() {
                     <Button
                     type="button"
                     variant="outline"
-                    onClick={appendNewExercise}
+                    onClick={() => appendNewExercise(false)}
                     >
                     <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Exercício
                     </Button>
@@ -325,6 +352,7 @@ export default function WorkoutBuilderPage() {
                 </div>
                 <FormDescription className="text-xs">
                     Exercícios modelo são sugestões e não constituem uma recomendação de treino profissional. Ajuste conforme suas necessidades.
+                    Séries de aquecimento em exercícios modelo são marcadas por padrão.
                 </FormDescription>
 
               </CardContent>
