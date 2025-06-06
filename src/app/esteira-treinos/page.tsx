@@ -58,9 +58,7 @@ function getDeadlineDisplayInfo(workout: WorkoutWithStatus): DeadlineDisplayInfo
       info.deadlineTextColorClass = "text-yellow-600 font-medium";
     } else if (workout.daysUntilDeadline !== undefined && workout.daysUntilDeadline > 1) {
       info.statusText = ` (em ${workout.daysUntilDeadline} dias)`;
-      // No special card class or alert icon for future, non-imminent deadlines
     }
-    // If none of the above, statusText remains "", and other props remain at their base/default
   }
   return info;
 }
@@ -73,12 +71,11 @@ export default function TrainingMatPage() {
   const [displayableWorkouts, setDisplayableWorkouts] = useState<WorkoutWithStatus[]>([]);
 
   useEffect(() => {
-    const today = startOfToday();
+    const todayAtStart = startOfToday(); // Represents 00:00:00 of the current local day
 
     const availableWorkouts = workouts.filter(workout => {
       const completedSessionsForThisWorkout = sessions.filter(s => s.workoutId === workout.id && s.isCompleted);
 
-      // Rule 1: Available if has frequency or deadline, and never done
       if ((workout.repeatFrequencyDays && workout.repeatFrequencyDays > 0) && completedSessionsForThisWorkout.length === 0) {
         return true; 
       }
@@ -86,33 +83,22 @@ export default function TrainingMatPage() {
          return true; 
       }
 
-      // Rule 2: If no frequency, only rely on deadline (covered by rule 1 if never done)
-      // If it has been done, and no frequency, it won't reappear unless deadline logic is added here.
-      // For now, if no frequency and done, it's not on the mat based on frequency.
       if (!workout.repeatFrequencyDays || workout.repeatFrequencyDays <= 0) {
-        // This condition is a bit tricky. If it has a deadline and never done, Rule 1 catches it.
-        // If it has a deadline and HAS been done, but no frequency, should it appear?
-        // Current logic: no, frequency is primary for re-appearance.
-        // If deadline is the only trigger after completion, this needs adjustment.
-        // Let's assume for now, frequency is needed for re-appearance after first completion.
-        // If it was only deadline-driven and completed, it's "done".
-        return false; // if no frequency, it does not re-appear based on frequency.
+        return false; 
       }
       
-      // Rule 3: Has frequency and has been completed at least once
       const completedSessionsSorted = sessions
         .filter(s => s.workoutId === workout.id && s.isCompleted)
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       
-      // This case should be covered by rule 1 (if never done and has frequency)
-      // if (completedSessionsSorted.length === 0) { 
-      //   return true;
-      // }
+      if (completedSessionsSorted.length === 0) { 
+        return true; // Should have been caught by the first rule if frequency is set
+      }
 
       const lastCompletionDate = startOfToday(parseISO(completedSessionsSorted[0].date));
       const nextAvailableDate = addDays(lastCompletionDate, workout.repeatFrequencyDays as number);
 
-      return isEqual(today, nextAvailableDate) || isBefore(nextAvailableDate, today);
+      return isEqual(todayAtStart, nextAvailableDate) || isBefore(nextAvailableDate, todayAtStart);
     });
 
     const workoutsWithStatus: WorkoutWithStatus[] = availableWorkouts.map(workout => {
@@ -121,30 +107,33 @@ export default function TrainingMatPage() {
       let isTodayDeadline = false;
 
       if (workout.deadline) {
-        const deadlineDate = startOfToday(parseISO(workout.deadline));
-        isOverdue = isBefore(deadlineDate, today);
-        daysUntilDeadline = differenceInDays(deadlineDate, today); 
+        // workout.deadline is an ISO string from Date.toISOString(), originally from a local midnight Date.
+        // parseISO will correctly create a Date object representing that local midnight.
+        const deadlineDate = parseISO(workout.deadline); 
+        
+        // isBefore compares deadlineDate (local midnight) with todayAtStart (local midnight)
+        isOverdue = isBefore(deadlineDate, todayAtStart);
+        // differenceInDays compares deadlineDate (local midnight) with todayAtStart (local midnight)
+        daysUntilDeadline = differenceInDays(deadlineDate, todayAtStart); 
+        // isToday checks if deadlineDate (local midnight) falls on the current local day.
         isTodayDeadline = isToday(deadlineDate);
       }
       return { ...workout, isOverdue, daysUntilDeadline, isTodayDeadline };
     });
 
     workoutsWithStatus.sort((a, b) => {
-      // 1. Overdue workouts first (sorted by oldest deadline)
       if (a.isOverdue && !b.isOverdue) return -1;
       if (!a.isOverdue && b.isOverdue) return 1;
       if (a.isOverdue && b.isOverdue) {
         return (a.daysUntilDeadline ?? -Infinity) - (b.daysUntilDeadline ?? -Infinity); 
       }
 
-      // 2. Workouts with deadline today
       if (a.isTodayDeadline && !b.isTodayDeadline) return -1;
       if (!a.isTodayDeadline && b.isTodayDeadline) return 1;
       if (a.isTodayDeadline && b.isTodayDeadline) { 
         return a.name.localeCompare(b.name);
       }
 
-      // 3. Workouts with deadline tomorrow (daysUntilDeadline === 1)
       const aIsTomorrow = !a.isOverdue && !a.isTodayDeadline && a.daysUntilDeadline === 1;
       const bIsTomorrow = !b.isOverdue && !b.isTodayDeadline && b.daysUntilDeadline === 1;
       if (aIsTomorrow && !bIsTomorrow) return -1;
@@ -153,7 +142,6 @@ export default function TrainingMatPage() {
          return a.name.localeCompare(b.name);
       }
       
-      // 4. Other workouts with deadlines (sorted by closest deadline)
       if (a.daysUntilDeadline !== undefined && b.daysUntilDeadline === undefined) return -1;
       if (a.daysUntilDeadline === undefined && b.daysUntilDeadline !== undefined) return 1;
       if (a.daysUntilDeadline !== undefined && b.daysUntilDeadline !== undefined) {
@@ -276,4 +264,3 @@ export default function TrainingMatPage() {
     </AppLayout>
   );
 }
-
