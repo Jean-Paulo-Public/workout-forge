@@ -30,6 +30,9 @@ jobs:
         # basePath: '/workout-forge', e assetPrefix: '/workout-forge/'
         run: npm run build # Isso deve gerar a pasta ./out
 
+      - name: Copy .gitignore to out directory 📄
+        run: cp .gitignore ./out/.gitignore # Copia o .gitignore da raiz para a pasta de saída
+
       - name: Deploy to GitHub Pages 🚀
         uses: peaceiris/actions-gh-pages@v4
         with:
@@ -40,3 +43,6 @@ jobs:
           # user_email: 'github-actions[bot]@users.noreply.github.com' # Opcional: Define o email do committer
           # commit_message: 'Deploy to GitHub Pages' # Opcional: Mensagem de commit customizada
           # cname: '' # Deixe vazio ou remova se não estiver usando um domínio customizado
+          # keep_files: false # O padrão é false. Como copiamos o .gitignore para ./out, ele será incluído.
+
+    
