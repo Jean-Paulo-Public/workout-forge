@@ -1,22 +1,17 @@
 
 import type {NextConfig} from 'next';
 
-const repositoryName = 'workout-forge';
+const repositoryName = 'workout-forge'; // Nome do seu repositório
 
 const nextConfig: NextConfig = {
   output: 'export',
   // Configure basePath e assetPrefix se você estiver implantando em um subdiretório no GitHub Pages
   // Ex: https://<username>.github.io/<repositoryName>/
-  // Se estiver implantando em um domínio raiz (ex: <username>.github.io ou um domínio personalizado),
-  // essas linhas podem ser removidas ou comentadas.
   basePath: `/${repositoryName}`,
-  assetPrefix: `/${repositoryName}/`,
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  assetPrefix: `/${repositoryName}/`, // A barra no final é importante.
+
+  // Essencial para exportação estática funcionar sem um servidor Next.js otimizando imagens.
+  // O GitHub Pages serve arquivos estáticos, não pode otimizar imagens em tempo real.
   images: {
     unoptimized: true,
     remotePatterns: [
@@ -27,6 +22,13 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+  },
+
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
   },
 };
 
