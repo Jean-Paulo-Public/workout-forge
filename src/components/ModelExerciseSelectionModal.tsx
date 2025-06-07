@@ -1,6 +1,7 @@
 
 "use client";
 
+import { useId } from 'react';
 import type { ModelExercise } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -17,12 +18,13 @@ interface ModelExerciseSelectionModalProps {
 }
 
 export function ModelExerciseSelectionModal({ isOpen, onClose, category, exercises, onSelectExercise }: ModelExerciseSelectionModalProps) {
+  const descriptionId = useId();
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg" aria-describedby={descriptionId}>
         <DialogHeader>
           <DialogTitle className="font-headline">Selecionar Exercício Modelo: {category}</DialogTitle>
-          <DialogDescription>
+          <DialogDescription id={descriptionId}>
             Escolha um exercício para adicionar ao seu treino. A descrição será adicionada como observação.
           </DialogDescription>
         </DialogHeader>

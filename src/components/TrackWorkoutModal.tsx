@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useCallback } from 'react';
+import { useEffect, useMemo, useCallback, useId } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -43,6 +43,7 @@ interface TrackWorkoutModalProps {
 
 export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkoutFinallyCompleted }: TrackWorkoutModalProps) {
   const { updateSessionExercisePerformance, completeSession, getLastUsedWeightForExercise } = useAppContext();
+  const descriptionId = useId();
 
   const form = useForm<TrackWorkoutFormData>({
     resolver: zodResolver(trackWorkoutFormSchema),
@@ -76,7 +77,7 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
       form.reset({ performances: initialPerformances });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, session, workout]); // form.reset and getLastUsedWeightForExercise are stable
+  }, [isOpen, session, workout]);
 
 
   const performancesFromWatch = form.watch('performances');
@@ -137,10 +138,10 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
 
   return (
     <Dialog open={isOpen} onOpenChange={(openState) => !openState && onClose()}>
-      <DialogContent className="max-w-xl w-full">
+      <DialogContent className="max-w-xl w-full" aria-describedby={descriptionId}>
         <DialogHeader>
           <DialogTitle className="font-headline">Acompanhar Treino: {workout.name}</DialogTitle>
-          <DialogDescription>
+          <DialogDescription id={descriptionId}>
             Marque os exercícios e seus aquecimentos (se houver) como concluídos e registre o peso utilizado.
           </DialogDescription>
         </DialogHeader>
@@ -148,13 +149,16 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
           <form>
             <ScrollArea className="h-[60vh] max-h-[calc(100vh-20rem)] my-4 pr-3">
               <div className="space-y-6">
-                {fields.map((item, index) => { // 'item' is from useFieldArray's 'fields'
-                  const canUndo = item.isExerciseCompleted || (item.hasWarmup && item.isWarmupCompleted);
+                {fields.map((item, index) => {
+                  const currentItemState = performancesFromWatch?.[index];
+                  if (!currentItemState) return null; 
+
+                  const canUndo = currentItemState.isExerciseCompleted || (currentItemState.hasWarmup && currentItemState.isWarmupCompleted);
 
                   let statusBadge: JSX.Element;
-                  if (item.isExerciseCompleted) {
+                  if (currentItemState.isExerciseCompleted) {
                     statusBadge = <Badge variant="default" className="bg-green-600 hover:bg-green-700 text-primary-foreground"><CheckCircle2 className="mr-1 h-3 w-3" />Concluído</Badge>;
-                  } else if (item.hasWarmup && !item.isWarmupCompleted) {
+                  } else if (currentItemState.hasWarmup && !currentItemState.isWarmupCompleted) {
                     statusBadge = <Badge variant="secondary" className="bg-orange-500 hover:bg-orange-600 text-white"><Flame className="mr-1 h-3 w-3" />Aquecimento Pendente</Badge>;
                   } else {
                     statusBadge = <Badge variant="outline"><Dumbbell className="mr-1 h-3 w-3" />Exercício Pendente</Badge>;
@@ -163,16 +167,16 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
                   return (
                   <div key={item.id} className="p-4 border rounded-md bg-card shadow-sm">
                     <div className="flex justify-between items-center mb-3">
-                        <h3 className="font-semibold text-lg">{item.exerciseName}</h3>
+                        <h3 className="font-semibold text-lg">{currentItemState.exerciseName}</h3>
                         {statusBadge}
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 mb-3">
                         <p className="text-sm text-muted-foreground">
-                            Planejado: <span className="font-medium text-foreground">{item.plannedWeight || "N/A"}</span>
+                            Planejado: <span className="font-medium text-foreground">{currentItemState.plannedWeight || "N/A"}</span>
                         </p>
                         <p className="text-sm text-muted-foreground">
-                            Último Usado: <span className="font-medium text-foreground">{item.lastUsedWeight || "N/A"}</span>
+                            Último Usado: <span className="font-medium text-foreground">{currentItemState.lastUsedWeight || "N/A"}</span>
                         </p>
                     </div>
 
@@ -191,15 +195,15 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
                                 field.onBlur();
                                 const currentVal = e.target.value;
                                 const weightToSave = (currentVal === '' || currentVal === undefined || currentVal === null) ? "0" : String(currentVal);
-                                if (item.exerciseId) {
+                                if (currentItemState.exerciseId) {
                                   updateSessionExercisePerformance(
                                     session.id,
-                                    item.exerciseId,
+                                    currentItemState.exerciseId,
                                     { weightUsed: weightToSave }
                                   );
                                 }
                               }}
-                              disabled={item.isExerciseCompleted}
+                              disabled={currentItemState.isExerciseCompleted}
                             />
                           </FormControl>
                           <FormMessage />
@@ -208,12 +212,12 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
                     />
 
                     <div className="mt-4 flex flex-wrap gap-2 justify-start">
-                        {item.hasWarmup && !item.isWarmupCompleted && !item.isExerciseCompleted && (
+                        {currentItemState.hasWarmup && !currentItemState.isWarmupCompleted && !currentItemState.isExerciseCompleted && (
                             <Button type="button" size="sm" variant="outline" onClick={() => handleMarkWarmupCompleted(index)}>
                                 <Flame className="mr-2 h-4 w-4 text-orange-500" /> Concluir Aquecimento
                             </Button>
                         )}
-                        {((item.hasWarmup && item.isWarmupCompleted) || !item.hasWarmup) && !item.isExerciseCompleted && (
+                        {((currentItemState.hasWarmup && currentItemState.isWarmupCompleted) || !currentItemState.hasWarmup) && !currentItemState.isExerciseCompleted && (
                             <Button type="button" size="sm" onClick={() => handleMarkExerciseCompleted(index)}>
                                 <CheckCircle2 className="mr-2 h-4 w-4" /> Concluir Exercício
                             </Button>
@@ -249,4 +253,3 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
     </Dialog>
   );
 }
-

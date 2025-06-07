@@ -1,6 +1,7 @@
 
 "use client";
 
+import { useId } from 'react';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { workoutTemplates } from "@/lib/workout-templates";
@@ -15,12 +16,13 @@ interface WorkoutTemplateSelectionModalProps {
 const templateCategories = Object.keys(workoutTemplates);
 
 export function WorkoutTemplateSelectionModal({ isOpen, onClose, onSelectTemplate }: WorkoutTemplateSelectionModalProps) {
+  const descriptionId = useId();
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" aria-describedby={descriptionId}>
         <DialogHeader>
           <DialogTitle className="font-headline">Adicionar Treino via Modelo</DialogTitle>
-          <DialogDescription>
+          <DialogDescription id={descriptionId}>
             Escolha um modelo de treino para adicionar rapidamente à sua biblioteca. Os
             exercícios usarão suas configurações padrão de séries e repetições.
           </DialogDescription>

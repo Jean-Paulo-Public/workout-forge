@@ -4,7 +4,10 @@
 // This component is no longer used and can be deleted.
 // Its functionality has been superseded by TrackWorkoutModal.tsx.
 
-import { useEffect } from 'react';
+// Keeping the file to avoid breaking imports if any exist, but it's deprecated.
+// To fully remove, delete this file and remove any import statements referencing it.
+
+import { useEffect, useId } from 'react'; // Added useId for consistency if ever reactivated
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -44,6 +47,7 @@ export function LogWeightsModal({ isOpen, onClose, workout, session, onSave }: L
       performances: [],
     },
   });
+  const descriptionId = useId();
 
   const { fields } = useFieldArray({
     control: form.control,
@@ -79,10 +83,10 @@ export function LogWeightsModal({ isOpen, onClose, workout, session, onSave }: L
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg" aria-describedby={descriptionId}>
         <DialogHeader>
           <DialogTitle className="font-headline">Registrar Pesos Utilizados: {workout.name}</DialogTitle>
-          <DialogDescription>
+          <DialogDescription id={descriptionId}>
             Confirme ou atualize os pesos que você utilizou para cada exercício nesta sessão.
             O valor padrão é o peso planejado no treino ou "0" se não especificado.
           </DialogDescription>

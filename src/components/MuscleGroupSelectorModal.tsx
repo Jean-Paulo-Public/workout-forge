@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useId } from 'react';
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -22,6 +23,7 @@ const ALL_MUSCLE_GROUPS = [
 
 export function MuscleGroupSelectorModal({ isOpen, onClose, initialSelectedGroups, onSave }: MuscleGroupSelectorModalProps) {
   const [selectedGroups, setSelectedGroups] = useState<string[]>(initialSelectedGroups);
+  const descriptionId = useId();
 
   useEffect(() => {
     setSelectedGroups(initialSelectedGroups);
@@ -40,10 +42,10 @@ export function MuscleGroupSelectorModal({ isOpen, onClose, initialSelectedGroup
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px]" aria-describedby={descriptionId}>
         <DialogHeader>
           <DialogTitle className="font-headline">Selecionar Grupos Musculares</DialogTitle>
-          <DialogDescription>
+          <DialogDescription id={descriptionId}>
             Marque os principais grupos musculares trabalhados neste exercício.
           </DialogDescription>
         </DialogHeader>

@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useId } from 'react';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
@@ -22,6 +22,7 @@ interface DeadlineUpdateModalProps {
 export function DeadlineUpdateModal({ isOpen, onClose, workout, onSave }: DeadlineUpdateModalProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [minDate, setMinDate] = useState<Date>(startOfToday());
+  const descriptionId = useId();
 
   useEffect(() => {
     if (isOpen && workout) {
@@ -62,10 +63,10 @@ export function DeadlineUpdateModal({ isOpen, onClose, workout, onSave }: Deadli
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" aria-describedby={descriptionId}>
         <DialogHeader>
           <DialogTitle className="font-headline">Atualizar Deadline para "{workout.name}"</DialogTitle>
-          <DialogDescription>
+          <DialogDescription id={descriptionId}>
             O treino foi concluído. Sugerimos um novo deadline com base na sua frequência de repetição de {workout.repeatFrequencyDays} dia(s).
             Você pode confirmar ou alterar a data abaixo, ou remover o deadline.
           </DialogDescription>

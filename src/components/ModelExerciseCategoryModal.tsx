@@ -1,6 +1,7 @@
 
 "use client";
 
+import { useId } from 'react';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { modelExerciseData } from "@/lib/model-exercises"; // Garanta que este arquivo exista e exporte as categorias
@@ -14,12 +15,13 @@ interface ModelExerciseCategoryModalProps {
 const categories = Object.keys(modelExerciseData);
 
 export function ModelExerciseCategoryModal({ isOpen, onClose, onSelectCategory }: ModelExerciseCategoryModalProps) {
+  const descriptionId = useId();
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" aria-describedby={descriptionId}>
         <DialogHeader>
           <DialogTitle className="font-headline">Selecionar Categoria de Exercício Modelo</DialogTitle>
-          <DialogDescription>
+          <DialogDescription id={descriptionId}>
             Escolha uma categoria para ver os exercícios modelo disponíveis.
           </DialogDescription>
         </DialogHeader>
