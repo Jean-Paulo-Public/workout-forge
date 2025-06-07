@@ -4,20 +4,14 @@ name: Deploy Workout Forge to GitHub Pages
 on:
   push:
     branches:
-      - main # Ou o nome do seu branch principal (ex: master)
+      - main # Ou o nome do seu branch principal
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write # Necessário para peaceiris/actions-gh-pages fazer push para o branch gh-pages
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-      
     steps:
       - name: Checkout 🛎️
         uses: actions/checkout@v4
@@ -34,18 +28,15 @@ jobs:
       - name: Build project 🏗️
         # O next.config.ts já deve estar configurado com output: 'export',
         # basePath: '/workout-forge', e assetPrefix: '/workout-forge/'
-        run: npm run build
-
-      - name: Setup Pages 🛠️
-        uses: actions/configure-pages@v5
-
-      - name: Upload artifact ⬆️
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./out # A pasta de saída do 'next build' com 'output: export'
+        run: npm run build # Isso deve gerar a pasta ./out
 
       - name: Deploy to GitHub Pages 🚀
-        id: deployment
-        uses: actions/deploy-pages@v4
-
-    
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./out
+          publish_branch: gh-pages # O branch para o qual os arquivos serão enviados
+          # user_name: 'github-actions[bot]' # Opcional: Define o nome do committer
+          # user_email: 'github-actions[bot]@users.noreply.github.com' # Opcional: Define o email do committer
+          # commit_message: 'Deploy to GitHub Pages' # Opcional: Mensagem de commit customizada
+          # cname: '' # Deixe vazio ou remova se não estiver usando um domínio customizado
