@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/sidebar';
 import { Navigation } from '@/components/navigation';
 import { Button } from '@/components/ui/button';
-import { Dumbbell, UserCircle } from 'lucide-react';
+import { Weight, UserCircle } from 'lucide-react'; // Changed Dumbbell to Weight
 import Link from 'next/link';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
@@ -27,7 +27,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       <Sidebar collapsible="icon" className="border-r">
         <SidebarHeader className="p-4 flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            <Dumbbell className="h-7 w-7 text-primary" />
+            <Weight className="h-7 w-7 text-primary" /> {/* Changed Dumbbell to Weight */}
             <h1 className="text-xl font-headline font-semibold group-data-[collapsible=icon]:hidden">
               Workout Forge
             </h1>
@@ -51,7 +51,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             <div className="flex items-center gap-2 md:hidden"> {/* Conteúdo esquerdo do cabeçalho (móvel) */}
                 <SidebarTrigger />
                 <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
-                    <Dumbbell className="h-6 w-6 text-primary" />
+                    <Weight className="h-6 w-6 text-primary" /> {/* Changed Dumbbell to Weight */}
                     <span>Workout Forge</span>
                 </Link>
             </div>
