@@ -21,7 +21,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { MuscleGroupSelectorModal } from '@/components/MuscleGroupSelectorModal';
 import { ModelExerciseCategoryModal } from '@/components/ModelExerciseCategoryModal';
 import { ModelExerciseSelectionModal } from '@/components/ModelExerciseSelectionModal';
-import { modelExerciseData } from '@/lib/model-exercises';
+import { modelExerciseData } from '@/lib/model-exercises/index';
 import { muscleGroupSuggestedFrequencies } from '@/lib/muscle-group-frequencies';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -710,5 +710,3 @@ export default function WorkoutBuilderPage() {
     </AppLayout>
   );
 }
-
-    
