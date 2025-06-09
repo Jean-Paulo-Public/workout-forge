@@ -31,17 +31,7 @@ import { Progress } from "@/components/ui/progress";
 // import { cn } from '@/lib/utils'; // Não utilizado no momento
 
 
-// Placeholder para o gráfico, mantido para evitar quebras se reintroduzido
-const PlaceholderChart = () => {
-  return (
-    <div className="bg-muted rounded-lg p-4 text-center text-sm text-muted-foreground">
-      [Gráfico de Progresso - Em breve]
-    </div>
-  );
-};
-
-
-export default function ProgressTrackingPage() {
+const ProgressTrackingPage = () => {
   const { sessions, getWorkoutById, deleteSession, markGlobalWarmupAsCompleted, undoGlobalWarmup, updateWorkout } = useAppContext();
   const { toast } = useToast();
 
@@ -58,7 +48,17 @@ export default function ProgressTrackingPage() {
 
 
   const sortedSessions = useMemo(() => {
-    return [...sessions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return [...sessions].sort((a, b) => {
+      // Primary sort: by completion status (in-progress/not completed first, then completed)
+      if (!a.isCompleted && b.isCompleted) {
+        return -1; // a (not completed) comes before b (completed)
+      }
+      if (a.isCompleted && !b.isCompleted) {
+        return 1;  // b (not completed) comes before a (completed)
+      }
+      // Secondary sort: by date (most recent first)
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
   }, [sessions]);
 
   const openTrackWorkoutModal = (session: WorkoutSession) => {
@@ -88,7 +88,7 @@ export default function ProgressTrackingPage() {
 
   const handleWorkoutFinallyCompleted = useCallback(() => {
     if (trackingSession) {
-      const workout = getWorkoutById(trackingSession.workoutId); // getWorkoutById é usado aqui
+      const workout = getWorkoutById(trackingSession.workoutId);
       if (workout?.repeatFrequencyDays && workout.repeatFrequencyDays > 0) {
         setWorkoutToUpdateDeadline(workout);
         setIsDeadlineModalOpen(true);
@@ -105,7 +105,6 @@ export default function ProgressTrackingPage() {
       }
     }
     // Não limpa trackingSession aqui, DeadlineUpdateModal o fará se necessário
-    // setTrackingSession(null); // Removido para manter a sessão ativa para o modal de deadline
   }, [trackingSession, getWorkoutById, toast]);
 
 
@@ -124,7 +123,7 @@ export default function ProgressTrackingPage() {
     }
     setIsDeadlineModalOpen(false);
     setWorkoutToUpdateDeadline(null);
-    setTrackingSession(null); // Limpa a sessão de rastreamento após o modal de deadline ser fechado
+    setTrackingSession(null); 
   };
 
   const handleDeleteSessionConfirm = () => {
@@ -161,7 +160,10 @@ export default function ProgressTrackingPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <PlaceholderChart />
+            {/* PlaceholderChart foi comentado e removido anteriormente para debugging */}
+            <div className="bg-muted rounded-lg p-4 text-center text-sm text-muted-foreground">
+              [Gráfico de Progresso - Em breve]
+            </div>
           </CardContent>
         </Card>
 
@@ -197,7 +199,7 @@ export default function ProgressTrackingPage() {
                       if (totalSteps > 0) {
                           progressPercent = Math.round((completedSteps / totalSteps) * 100);
                       } else if (session.isCompleted) {
-                          progressPercent = 100; // Se não há passos mas está completa (ex: treino sem exercícios mas com aquecimento global)
+                          progressPercent = 100;
                       }
                   }
 
@@ -302,7 +304,7 @@ export default function ProgressTrackingPage() {
           onClose={() => {
             setIsDeadlineModalOpen(false);
             setWorkoutToUpdateDeadline(null);
-            setTrackingSession(null); // Limpa a sessão de rastreamento após o modal de deadline ser fechado
+            setTrackingSession(null); 
           }}
           workout={workoutToUpdateDeadline}
           onSave={handleDeadlineSave}
@@ -310,5 +312,6 @@ export default function ProgressTrackingPage() {
       )}
     </AppLayout>
   );
-}
+};
+export default ProgressTrackingPage;
 
