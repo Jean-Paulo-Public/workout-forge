@@ -1,9 +1,10 @@
+
 "use client";
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Dumbbell } from 'lucide-react';
+import { Weight } from 'lucide-react'; // Changed from Dumbbell
 import { useState, useEffect } from 'react';
 
 export default function WelcomePage() {
@@ -18,7 +19,7 @@ export default function WelcomePage() {
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <Dumbbell className="h-16 w-16 text-primary" />
+            <Weight className="h-16 w-16 text-primary" /> {/* Changed from Dumbbell */}
           </div>
           <CardTitle className="text-3xl font-headline">Bem-vindo ao Workout Forge!</CardTitle>
           <CardDescription className="text-md text-muted-foreground pt-2">
