@@ -2,7 +2,7 @@
 'use client';
 
 import type { ModelExercise, Exercise, Workout, UserSettings } from './types';
-import { modelExerciseData } from './model-exercises/index'; // Corrigido para apontar explicitamente para index.ts
+import { modelExerciseData } from './model-exercises/index';
 import { muscleGroupSuggestedFrequencies } from './muscle-group-frequencies';
 import { startOfToday, addDays } from 'date-fns';
 
@@ -132,21 +132,22 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
   },
   "CoreEAcessorios": {
     name: "Treino Modelo - Core e Acessórios",
-    description: "Exercícios para fortalecer o abdômen e lombar.",
+    description: "Exercícios para fortalecer abdômen, lombar e antebraços.",
     targetMuscleGroups: [
       { group: 'Abdômen', count: 2 },
       { group: 'Lombar', count: 1 },
+      { group: 'Antebraço', count: 1 },
     ],
-    hasGlobalWarmup: true,
+    hasGlobalWarmup: false, // Geralmente aquecimento global não é crítico para esses
   },
   "CoreEAcessorios_Mini": {
     name: "Treino Modelo - Core e Acessórios [ Mini ]",
-    description: "Versão compacta para fortalecer abdômen e lombar, com um exercício para cada.",
+    description: "Versão compacta para fortalecer abdômen e lombar.",
     targetMuscleGroups: [
       { group: 'Abdômen', count: 1 },
       { group: 'Lombar', count: 1 },
     ],
-    hasGlobalWarmup: true,
+    hasGlobalWarmup: false, // Geralmente aquecimento global não é crítico para esses
   }
 };
 
@@ -186,9 +187,15 @@ export function generateWorkoutFromTemplate(
         !usedExerciseNamesInCurrentWorkout.has(modelEx.name)
     );
 
+    // Prioritize exercises that are more specific to the target group if possible
+    // This is a simple heuristic: exercises with fewer listed muscle groups are often more "isolating" or "primary" for the target.
+    candidates.sort((a, b) => a.muscleGroups.length - b.muscleGroups.length);
+
+
     const brandNewCandidates = candidates.filter(c => !allExistingExerciseNames.has(c.name));
     const existingElsewhereCandidates = candidates.filter(c => allExistingExerciseNames.has(c.name));
 
+    // Shuffle within priority groups
     shuffleArray(brandNewCandidates);
     shuffleArray(existingElsewhereCandidates);
 
@@ -219,6 +226,8 @@ export function generateWorkoutFromTemplate(
     exercisesForThisGroupTarget.forEach(modelEx => {
       let exerciseSpecificWarmup = false;
       if (determineModelExerciseWarmup(modelEx)) {
+        // For multi-exercise groups, only assign specific warmup to the first one (or based on count)
+        // For single-exercise groups (like in Mini templates), always assign if applicable
         if (target.count === 1 || !assignedWarmupForGroup.has(target.group)) {
           exerciseSpecificWarmup = true;
           assignedWarmupForGroup.add(target.group);
@@ -253,16 +262,15 @@ export function generateWorkoutFromTemplate(
     ];
 
   if (templateKey.includes("_Mini")) {
-    let calculatedRepeatFrequency = 1; // Default para mini (músculos menores)
+    let calculatedRepeatFrequency = 1; 
     for (const exercise of generatedExercises) {
         if (exercise.muscleGroups?.some(group => majorMuscleGroupsForFrequency.includes(group))) {
-            calculatedRepeatFrequency = 2; // Músculos grandes -> 2 dias
+            calculatedRepeatFrequency = 2; 
             break;
         }
     }
     suggestedFrequencyDays = calculatedRepeatFrequency;
   } else {
-    // Para modelos normais, calcular a frequência máxima sugerida
     let maxSuggestedFrequency = 0;
     generatedExercises.forEach(exercise => {
       if (exercise.muscleGroups && exercise.muscleGroups.length > 0) {
@@ -288,8 +296,8 @@ export function generateWorkoutFromTemplate(
     description: template.description,
     exercises: generatedExercises,
     hasGlobalWarmup: template.hasGlobalWarmup !== undefined ? template.hasGlobalWarmup : true,
-    repeatFrequencyDays: undefined, // Será definido pelo usuário no modal
-    deadline: undefined, // Será definido pelo usuário no modal
+    repeatFrequencyDays: undefined, 
+    deadline: undefined, 
   };
 
   return {
@@ -298,3 +306,4 @@ export function generateWorkoutFromTemplate(
     suggestedDeadlineISO,
   };
 }
+
