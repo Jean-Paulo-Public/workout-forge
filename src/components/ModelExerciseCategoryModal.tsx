@@ -4,7 +4,7 @@
 import { useId } from 'react';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { modelExerciseData } from "@/lib/model-exercises"; // Garanta que este arquivo exista e exporte as categorias
+import { modelExerciseData } from "@/lib/model-exercises"; // Atualizado para o novo caminho
 
 interface ModelExerciseCategoryModalProps {
   isOpen: boolean;

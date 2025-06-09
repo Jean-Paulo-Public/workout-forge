@@ -28,6 +28,11 @@ import { Badge } from "@/components/ui/badge";
 import { WorkoutTemplateSelectionModal } from '@/components/WorkoutTemplateSelectionModal';
 import { ConfirmScheduleModal } from '@/components/ConfirmScheduleModal';
 import { generateWorkoutFromTemplate } from '@/lib/workout-templates';
+import { Separator } from '@/components/ui/separator';
+
+interface MuscleGroupSummary {
+  [groupName: string]: number;
+}
 
 export default function WorkoutLibraryPage() {
   const { workouts, deleteWorkout, addSession, getWorkoutById, hasActiveSession, userSettings, addWorkout: addContextWorkout, updateWorkoutsOrder } = useAppContext();
@@ -109,6 +114,16 @@ export default function WorkoutLibraryPage() {
       display += ` (Obs: ${exercise.notes.substring(0, 30)}...)`;
     }
     return display;
+  };
+
+  const calculateMuscleGroupSummary = (workout: Workout): MuscleGroupSummary => {
+    const summary: MuscleGroupSummary = {};
+    workout.exercises.forEach(ex => {
+      ex.muscleGroups?.forEach(group => {
+        summary[group] = (summary[group] || 0) + ex.sets;
+      });
+    });
+    return summary;
   };
 
   const handleSelectWorkoutTemplate = (templateKey: string) => {
@@ -368,24 +383,41 @@ export default function WorkoutLibraryPage() {
               )}
             </AlertDialogHeader>
             <div className="max-h-[60vh] overflow-y-auto pr-2 space-y-3 py-4">
-              <h4 className="font-semibold text-md">Exercícios:</h4>
-              {selectedWorkout.exercises.map((ex, idx) => (
-                <div key={ex.id} className="text-sm border-b pb-2 mb-2">
-                  <p className="font-medium">
-                    {ex.hasWarmup && <Flame className="inline h-4 w-4 mr-1 text-orange-500" title="Série de aquecimento incluída" />}
-                    {idx + 1}. {ex.name}
-                  </p>
-                  <p className="text-muted-foreground">Séries: {ex.sets}, Reps: {ex.reps}</p>
-                  {ex.weight && <p className="text-xs text-muted-foreground">Peso: {ex.weight}</p>}
-                  {ex.muscleGroups && ex.muscleGroups.length > 0 && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                      <Target className="h-3 w-3" />
-                      {ex.muscleGroups.join(', ')}
+              <div>
+                <h4 className="font-semibold text-md mb-2">Exercícios:</h4>
+                {selectedWorkout.exercises.map((ex, idx) => (
+                  <div key={ex.id} className="text-sm border-b pb-2 mb-2">
+                    <p className="font-medium">
+                      {ex.hasWarmup && <Flame className="inline h-4 w-4 mr-1 text-orange-500" title="Série de aquecimento incluída" />}
+                      {idx + 1}. {ex.name}
                     </p>
-                  )}
-                  {ex.notes && <p className="text-xs text-muted-foreground italic mt-1">Obs: {ex.notes}</p>}
-                </div>
-              ))}
+                    <p className="text-muted-foreground">Séries: {ex.sets}, Reps: {ex.reps}</p>
+                    {ex.weight && <p className="text-xs text-muted-foreground">Peso: {ex.weight}</p>}
+                    {ex.muscleGroups && ex.muscleGroups.length > 0 && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                        <Target className="h-3 w-3" />
+                        {ex.muscleGroups.join(', ')}
+                      </p>
+                    )}
+                    {ex.notes && <p className="text-xs text-muted-foreground italic mt-1">Obs: {ex.notes}</p>}
+                  </div>
+                ))}
+              </div>
+              <Separator className="my-3"/>
+              <div>
+                <h4 className="font-semibold text-md mb-1">Resumo de Séries por Grupo Muscular:</h4>
+                {Object.entries(calculateMuscleGroupSummary(selectedWorkout)).length > 0 ? (
+                  <ul className="list-disc list-inside text-sm text-muted-foreground space-y-0.5">
+                    {Object.entries(calculateMuscleGroupSummary(selectedWorkout))
+                      .sort(([groupA], [groupB]) => groupA.localeCompare(groupB))
+                      .map(([group, count]) => (
+                        <li key={group}>{group}: {count} séries</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">Nenhum grupo muscular definido para os exercícios deste treino.</p>
+                )}
+              </div>
             </div>
             <AlertDialogFooter>
               <AlertDialogCancel onClick={() => setSelectedWorkout(null)}>Fechar</AlertDialogCancel>
@@ -427,5 +459,3 @@ export default function WorkoutLibraryPage() {
     </AppLayout>
   );
 }
-
-    
