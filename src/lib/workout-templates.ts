@@ -2,7 +2,7 @@
 'use client';
 
 import type { ModelExercise, Exercise, Workout, UserSettings } from './types';
-import { modelExerciseData } from './model-exercises/index';
+import { modelExerciseData } from './model-exercises/index'; // Corrigido para o novo caminho do diretório
 import { muscleGroupSuggestedFrequencies } from './muscle-group-frequencies';
 import { startOfToday, addDays } from 'date-fns';
 
@@ -15,7 +15,6 @@ function shuffleArray<T>(array: T[]): T[] {
   return array;
 }
 
-// Copied from src/app/builder/page.tsx and adapted
 function determineModelExerciseWarmup(exerciseDetails?: ModelExercise): boolean {
   if (!exerciseDetails) return true;
   const nameLower = exerciseDetails.name.toLowerCase();
@@ -23,6 +22,12 @@ function determineModelExerciseWarmup(exerciseDetails?: ModelExercise): boolean 
   const isHIIT = nameLower.includes('hiit');
 
   if (nameLower === 'prancha abdominal' || nameLower === 'alongamento (geral)' || (isCardio && !isHIIT)) {
+    return false;
+  }
+  // For Core/Accessory specific exercises, generally no specific warmup step in the template
+  if (['Abdômen', 'Lombar', 'Antebraço'].some(coreGroup => exerciseDetails.muscleGroups.includes(coreGroup)) &&
+      !exerciseDetails.muscleGroups.some(majorGroup => ['Peito', 'Costas', 'Pernas (Quadríceps)', 'Pernas (Posteriores)', 'Glúteos', 'Ombros'].includes(majorGroup))
+  ) {
     return false;
   }
   return true;
@@ -66,7 +71,7 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
     targetMuscleGroups: [
       { group: 'Bíceps', count: 2 },
       { group: 'Tríceps', count: 2 },
-      { group: 'Antebraço', count: 2 },
+      { group: 'Antebraço', count: 1 }, // Ajustado para 1 para mais foco, pode ser 2
     ],
     hasGlobalWarmup: true,
   },
@@ -110,7 +115,7 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
     name: "Treino Modelo - Peitoral [ Mini ]",
     description: "Versão compacta para o desenvolvimento do peitoral, com um exercício principal.",
     targetMuscleGroups: [
-      { group: 'Peito', count: 1 },
+      { group: 'Peito', count: 1 }, // Poderia ser 2 para um mini mais focado
     ],
     hasGlobalWarmup: true,
   },
@@ -126,7 +131,7 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
     name: "Treino Modelo - Costas [ Mini ]",
     description: "Versão compacta para as costas, com um exercício fundamental.",
     targetMuscleGroups: [
-      { group: 'Costas', count: 1 },
+      { group: 'Costas', count: 1 }, // Poderia ser 2
     ],
     hasGlobalWarmup: true,
   },
@@ -138,7 +143,7 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
       { group: 'Lombar', count: 1 },
       { group: 'Antebraço', count: 1 },
     ],
-    hasGlobalWarmup: false, // Geralmente aquecimento global não é crítico para esses
+    hasGlobalWarmup: false,
   },
   "CoreEAcessorios_Mini": {
     name: "Treino Modelo - Core e Acessórios [ Mini ]",
@@ -147,7 +152,7 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
       { group: 'Abdômen', count: 1 },
       { group: 'Lombar', count: 1 },
     ],
-    hasGlobalWarmup: false, // Geralmente aquecimento global não é crítico para esses
+    hasGlobalWarmup: false,
   }
 };
 
@@ -156,6 +161,21 @@ interface GeneratedWorkoutOutput {
   suggestedFrequencyDays?: number;
   suggestedDeadlineISO?: string;
 }
+
+
+// Define specific lists of appropriate exercises for Core & Accessories templates
+const coreSpecificAbdominalExercises: ModelExercise[] = modelExerciseData['Outros'].filter(ex =>
+  ex.muscleGroups.includes('Abdômen') && !ex.name.includes('Flexão de Braço') && !ex.name.includes('Agachamento')
+); // e.g., Prancha, Supra, Infra, Oblíquo
+
+const coreSpecificLombarExercises: ModelExercise[] = modelExerciseData['Outros'].filter(ex =>
+  ex.name === 'Cadeira de Lombar (Hiperextensão)'
+);
+
+const coreSpecificAntebracoExercises: ModelExercise[] = modelExerciseData['Braços'].filter(ex =>
+  ex.muscleGroups.includes('Antebraço') && (ex.name === 'Antebraço Barra (Rosca de Punho)' || ex.name === 'Rosca Zottman')
+);
+
 
 export function generateWorkoutFromTemplate(
   templateKey: string,
@@ -170,32 +190,45 @@ export function generateWorkoutFromTemplate(
 
   const generatedExercises: Exercise[] = [];
   const usedExerciseNamesInCurrentWorkout = new Set<string>();
-  const assignedWarmupForGroup = new Set<string>();
+  const assignedWarmupForGroup = new Set<string>(); // Track if warmup assigned for a group
 
   const allExistingExerciseNames = new Set<string>();
   existingWorkouts.forEach(workout => {
       workout.exercises.forEach(ex => allExistingExerciseNames.add(ex.name));
   });
 
-  const allModelExercisesFlat = Object.values(modelExerciseData).flat();
+  const isCoreTemplate = templateKey.startsWith("CoreEAcessorios");
 
   template.targetMuscleGroups.forEach(target => {
-    const exercisesForThisGroupTarget: ModelExercise[] = [];
+    let exercisesForThisGroupTarget: ModelExercise[] = [];
+    let candidatePool: ModelExercise[];
+
+    if (isCoreTemplate) {
+      if (target.group === 'Abdômen') {
+        candidatePool = [...coreSpecificAbdominalExercises];
+      } else if (target.group === 'Lombar') {
+        candidatePool = [...coreSpecificLombarExercises];
+      } else if (target.group === 'Antebraço') {
+        candidatePool = [...coreSpecificAntebracoExercises];
+      } else {
+        candidatePool = []; // Should not happen if template is defined correctly
+      }
+    } else {
+      // Original logic for non-core templates
+      candidatePool = Object.values(modelExerciseData).flat().filter(modelEx =>
+        modelEx.muscleGroups.includes(target.group)
+      );
+    }
     
-    let candidates = allModelExercisesFlat.filter(modelEx => 
-        modelEx.muscleGroups.includes(target.group) && 
-        !usedExerciseNamesInCurrentWorkout.has(modelEx.name)
-    );
-
-    // Prioritize exercises that are more specific to the target group if possible
-    // This is a simple heuristic: exercises with fewer listed muscle groups are often more "isolating" or "primary" for the target.
+    let candidates = candidatePool.filter(modelEx => !usedExerciseNamesInCurrentWorkout.has(modelEx.name));
+    
+    // Simple sort to prefer more "specific" exercises (fewer muscle groups listed)
+    // This helps but isn't a perfect solution for all cases.
     candidates.sort((a, b) => a.muscleGroups.length - b.muscleGroups.length);
-
 
     const brandNewCandidates = candidates.filter(c => !allExistingExerciseNames.has(c.name));
     const existingElsewhereCandidates = candidates.filter(c => allExistingExerciseNames.has(c.name));
 
-    // Shuffle within priority groups
     shuffleArray(brandNewCandidates);
     shuffleArray(existingElsewhereCandidates);
 
@@ -211,7 +244,7 @@ export function generateWorkoutFromTemplate(
     if (needed > 0) {
         for (const existingEx of existingElsewhereCandidates) {
             if (needed === 0) break;
-            if (!usedExerciseNamesInCurrentWorkout.has(existingEx.name)) { 
+            if (!usedExerciseNamesInCurrentWorkout.has(existingEx.name)) {
                 exercisesForThisGroupTarget.push(existingEx);
                 usedExerciseNamesInCurrentWorkout.add(existingEx.name);
                 needed--;
@@ -224,15 +257,17 @@ export function generateWorkoutFromTemplate(
     }
 
     exercisesForThisGroupTarget.forEach(modelEx => {
-      let exerciseSpecificWarmup = false;
-      if (determineModelExerciseWarmup(modelEx)) {
-        // For multi-exercise groups, only assign specific warmup to the first one (or based on count)
-        // For single-exercise groups (like in Mini templates), always assign if applicable
-        if (target.count === 1 || !assignedWarmupForGroup.has(target.group)) {
-          exerciseSpecificWarmup = true;
+      let exerciseSpecificWarmup = determineModelExerciseWarmup(modelEx);
+
+      // For multi-exercise groups, only assign specific warmup to a limited number (e.g., first one)
+      if (exerciseSpecificWarmup && target.count > 1) {
+        if (assignedWarmupForGroup.has(target.group)) {
+          exerciseSpecificWarmup = false; // Warmup already assigned for one exercise in this group
+        } else {
           assignedWarmupForGroup.add(target.group);
         }
       }
+
 
       generatedExercises.push({
         id: generateId(),
@@ -251,26 +286,22 @@ export function generateWorkoutFromTemplate(
       console.warn(`Nenhum exercício gerado para o modelo: ${templateKey}`);
   }
 
+  // Logic for suggestedFrequencyDays and suggestedDeadlineISO
   let suggestedFrequencyDays: number | undefined = undefined;
   let suggestedDeadlineISO: string | undefined = undefined;
   const today = startOfToday();
 
-  const majorMuscleGroupsForFrequency = [
+  if (templateKey.includes("_Mini")) {
+    const majorMuscleGroupsInMini = [
       'Peito', 'Costas', 
       'Pernas (Quadríceps)', 'Pernas (Posteriores)', 'Glúteos', 
-      'Lombar' 
+      'Lombar' // Consider Lombar as major for this specific calculation
     ];
-
-  if (templateKey.includes("_Mini")) {
-    let calculatedRepeatFrequency = 1; 
-    for (const exercise of generatedExercises) {
-        if (exercise.muscleGroups?.some(group => majorMuscleGroupsForFrequency.includes(group))) {
-            calculatedRepeatFrequency = 2; 
-            break;
-        }
-    }
-    suggestedFrequencyDays = calculatedRepeatFrequency;
-  } else {
+    const hasMajorMuscle = generatedExercises.some(ex => 
+        ex.muscleGroups?.some(group => majorMuscleGroupsInMini.includes(group))
+    );
+    suggestedFrequencyDays = hasMajorMuscle ? 2 : 1;
+  } else if (!isCoreTemplate) { // Normal (non-mini, non-core) templates
     let maxSuggestedFrequency = 0;
     generatedExercises.forEach(exercise => {
       if (exercise.muscleGroups && exercise.muscleGroups.length > 0) {
@@ -284,7 +315,10 @@ export function generateWorkoutFromTemplate(
     if (maxSuggestedFrequency > 0) {
       suggestedFrequencyDays = maxSuggestedFrequency;
     }
+  } else { // Core templates (non-mini and mini)
+      suggestedFrequencyDays = 2; // Default for core workouts, can be adjusted
   }
+
 
   if (suggestedFrequencyDays && suggestedFrequencyDays > 0) {
     suggestedDeadlineISO = addDays(today, suggestedFrequencyDays).toISOString();
@@ -295,8 +329,8 @@ export function generateWorkoutFromTemplate(
     name: template.name,
     description: template.description,
     exercises: generatedExercises,
-    hasGlobalWarmup: template.hasGlobalWarmup !== undefined ? template.hasGlobalWarmup : true,
-    repeatFrequencyDays: undefined, 
+    hasGlobalWarmup: template.hasGlobalWarmup !== undefined ? template.hasGlobalWarmup : (isCoreTemplate ? false : true), // Default global warmup false for core
+    repeatFrequencyDays: undefined,
     deadline: undefined, 
   };
 
@@ -306,4 +340,3 @@ export function generateWorkoutFromTemplate(
     suggestedDeadlineISO,
   };
 }
-
