@@ -6,8 +6,8 @@ import { AppLayout } from '@/components/layout/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAppContext } from '@/contexts/AppContext';
-import type { Workout, WorkoutSession } from '@/lib/types';
-import { Play, Trash2, Flame, Undo2 } from 'lucide-react';
+import type { Workout, WorkoutSession, Exercise as WorkoutExerciseType } from '@/lib/types'; // Renomeado para evitar conflito
+import { Play, Trash2, Flame, Undo2, BarChartHorizontalBig, Target } from 'lucide-react';
 // import Link from 'next/link'; // Não utilizado no momento
 import {
   AlertDialog,
@@ -30,6 +30,25 @@ import { Separator } from '@/components/ui/separator';
 import { Progress } from "@/components/ui/progress";
 // import { cn } from '@/lib/utils'; // Não utilizado no momento
 
+interface MuscleGroupSummary {
+  [groupName: string]: number;
+}
+
+// Helper function para calcular o resumo de séries por grupo muscular para um workout
+function calculateWorkoutMuscleGroupSummary(workoutExercises: WorkoutExerciseType[]): MuscleGroupSummary {
+  const summary: MuscleGroupSummary = {};
+  if (!workoutExercises) return summary;
+
+  workoutExercises.forEach(ex => {
+    if (ex && ex.name && ex.name.trim() !== '' && typeof ex.sets === 'number' && ex.sets > 0) {
+      (ex.muscleGroups || []).forEach(group => {
+        summary[group] = (summary[group] || 0) + ex.sets;
+      });
+    }
+  });
+  return summary;
+}
+
 
 const ProgressTrackingPage = () => {
   const { sessions, getWorkoutById, deleteSession, markGlobalWarmupAsCompleted, undoGlobalWarmup, updateWorkout } = useAppContext();
@@ -49,14 +68,10 @@ const ProgressTrackingPage = () => {
 
   const sortedSessions = useMemo(() => {
     return [...sessions].sort((a, b) => {
-      // Primary sort: by completion status (in-progress/not completed first, then completed)
-      if (!a.isCompleted && b.isCompleted) {
-        return -1; // a (not completed) comes before b (completed)
-      }
-      if (a.isCompleted && !b.isCompleted) {
-        return 1;  // b (not completed) comes before a (completed)
-      }
-      // Secondary sort: by date (most recent first)
+      // Primeiro: sessões não concluídas
+      if (!a.isCompleted && b.isCompleted) return -1;
+      if (a.isCompleted && !b.isCompleted) return 1;
+      // Se ambos têm o mesmo status de conclusão, ordenar pela data (mais recente primeiro)
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
   }, [sessions]);
@@ -184,6 +199,8 @@ const ProgressTrackingPage = () => {
                   const isGlobalWarmupApplicable = workout?.hasGlobalWarmup === true;
                   const canUndoGlobalWarmup = isGlobalWarmupApplicable && session.isGlobalWarmupCompleted === true && !session.isCompleted;
                   const canCompleteGlobalWarmup = isGlobalWarmupApplicable && session.isGlobalWarmupCompleted === false && !session.isCompleted;
+                  
+                  const muscleSummary = workout ? calculateWorkoutMuscleGroupSummary(workout.exercises) : {};
 
                   let progressPercent = 0;
                   if (workout && session.exercisePerformances) {
@@ -232,6 +249,24 @@ const ProgressTrackingPage = () => {
                            )}
 
                           {session.notes && !session.isCompleted && <p className="text-xs text-muted-foreground mt-1.5">Última Nota: {session.notes.split('.').slice(-2).join('.').trim() || session.notes}</p>}
+                          
+                          {workout && Object.keys(muscleSummary).length > 0 && (
+                            <div className="mt-3 pt-3 border-t">
+                                <h4 className="text-xs font-semibold mb-1 text-muted-foreground flex items-center gap-1">
+                                   <Target className="h-3 w-3" /> Séries Planejadas por Grupo:
+                                </h4>
+                                <ul className="text-xs text-muted-foreground space-y-0.5 grid grid-cols-2 sm:grid-cols-3 gap-x-2">
+                                {Object.entries(muscleSummary)
+                                    .sort(([groupA], [groupB]) => groupA.localeCompare(groupB))
+                                    .map(([group, count]) => (
+                                    <li key={group}>
+                                        <span className="font-medium text-foreground/80">{group}:</span> {count}
+                                    </li>
+                                    ))}
+                                </ul>
+                            </div>
+                          )}
+
                         </div>
 
                         <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 order-1 sm:order-2 w-full sm:w-auto">
@@ -315,3 +350,5 @@ const ProgressTrackingPage = () => {
 };
 export default ProgressTrackingPage;
 
+
+    
