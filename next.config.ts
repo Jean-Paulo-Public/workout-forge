@@ -1,17 +1,16 @@
 
 import type {NextConfig} from 'next';
 
-const repositoryName = 'workout-forge'; // Nome do seu repositório
+// A variável repositoryName não é mais necessária aqui, pois basePath e assetPrefix serão removidos.
 
 const nextConfig: NextConfig = {
   output: 'export',
-  // Configure basePath e assetPrefix se você estiver implantando em um subdiretório no GitHub Pages
-  // Ex: https://<username>.github.io/<repositoryName>/
-  basePath: `/${repositoryName}`,
-  assetPrefix: `/${repositoryName}/`, // A barra no final é importante.
+  // As configurações basePath e assetPrefix foram removidas para o branch 'release'.
+  // Elas são usadas quando o site é hospedado em um subdiretório (ex: GitHub Pages).
+  // O Firebase Studio e o Firebase App Hosting geralmente servem o site da raiz.
 
   // Essencial para exportação estática funcionar sem um servidor Next.js otimizando imagens.
-  // O GitHub Pages serve arquivos estáticos, não pode otimizar imagens em tempo real.
+  // Mantido pois é útil para ambientes de hospedagem estática como o Firebase App Hosting.
   images: {
     unoptimized: true,
     remotePatterns: [
