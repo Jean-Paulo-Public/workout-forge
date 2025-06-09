@@ -162,18 +162,32 @@ export default function ProgressTrackingPage() {
 
                       return (
                       <li key={session.id} className="p-3 border rounded-md bg-card hover:bg-muted/10 transition-colors">
-                        <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
-                          <div className="flex-grow">
-                            <p className="font-semibold">{displayName}</p>
-                            <p className="text-sm text-muted-foreground">
-                              Iniciado em: {format(new Date(session.date), 'PPP p', { locale: ptBR })}
-                            </p>
-                            {session.notes && <p className="text-xs italic mt-1 text-muted-foreground">{session.notes}</p>}
-                          </div>
-                          <div className="flex flex-wrap items-center sm:flex-nowrap justify-start sm:justify-end gap-2 mt-2 sm:mt-0 w-full sm:w-auto">
+                        <div className="flex flex-col sm:flex-row sm:justify-between items-start gap-2">
+                          {/* Botões de Ação - Order 1 em mobile, Order 2 em sm+ */}
+                          <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 mt-2 sm:mt-0 w-full sm:w-auto order-1 sm:order-2">
                             {!session.isCompleted && !isWorkoutDeleted ? (
                               <>
-                                {hasGlobalWarmup && !session.isGlobalWarmupCompleted && (
+                                {hasGlobalWarmup && session.isGlobalWarmupCompleted ? (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="default"
+                                      onClick={() => openTrackWorkoutModal(session)}
+                                      className="whitespace-nowrap"
+                                    >
+                                      <PlayCircle className="mr-2 h-4 w-4 text-primary-foreground" /> Acompanhar
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleUndoGlobalWarmup(session.id, session.workoutName)}
+                                      className="whitespace-nowrap"
+                                      title="Desfazer aquecimento global"
+                                    >
+                                      <Undo2 className="mr-2 h-4 w-4" /> Desfazer Aquecimento
+                                    </Button>
+                                  </>
+                                ) : hasGlobalWarmup && !session.isGlobalWarmupCompleted ? (
                                   <Button
                                     size="sm"
                                     variant="outline"
@@ -182,29 +196,15 @@ export default function ProgressTrackingPage() {
                                   >
                                     <Flame className="mr-2 h-4 w-4 text-orange-500" /> Concluir Aquecimento
                                   </Button>
-                                )}
-                                
-                                {(!hasGlobalWarmup || session.isGlobalWarmupCompleted) && (
-                                  <Button
-                                    size="sm"
-                                    variant="default"
-                                    onClick={() => openTrackWorkoutModal(session)}
-                                    className="whitespace-nowrap"
-                                  >
-                                    <PlayCircle className="mr-2 h-4 w-4 text-primary-foreground" /> Acompanhar
-                                  </Button>
-                                )}
-
-                                {hasGlobalWarmup && session.isGlobalWarmupCompleted && (
-                                   <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => handleUndoGlobalWarmup(session.id, session.workoutName)}
-                                    className="whitespace-nowrap"
-                                    title="Desfazer aquecimento global"
-                                  >
-                                    <Undo2 className="mr-2 h-4 w-4" /> Desfazer Aquecimento
-                                  </Button>
+                                ) : ( // Não tem aquecimento global
+                                    <Button
+                                      size="sm"
+                                      variant="default"
+                                      onClick={() => openTrackWorkoutModal(session)}
+                                      className="whitespace-nowrap"
+                                    >
+                                      <PlayCircle className="mr-2 h-4 w-4 text-primary-foreground" /> Acompanhar
+                                    </Button>
                                 )}
                                
                                 <AlertDialog>
@@ -244,6 +244,16 @@ export default function ProgressTrackingPage() {
                               )
                             )}
                           </div>
+
+                           {/* Informações do Treino - Order 2 em mobile, Order 1 em sm+ */}
+                          <div className="flex-grow order-2 sm:order-1">
+                            <p className="font-semibold">{displayName}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Iniciado em: {format(new Date(session.date), 'PPP p', { locale: ptBR })}
+                            </p>
+                            {session.notes && <p className="text-xs italic mt-1 text-muted-foreground">{session.notes}</p>}
+                          </div>
+
                         </div>
                         {session.isCompleted && session.exercisePerformances && session.exercisePerformances.length > 0 && (
                           <div className="mt-2 pt-2 border-t">
@@ -272,7 +282,7 @@ export default function ProgressTrackingPage() {
           <CardHeader>
             <CardTitle className="font-headline">Mais Estatísticas</CardTitle>
             <CardDescription>Desempenho detalhado de exercícios e recordes pessoais (PRs) estarão disponíveis aqui em atualizações futuras.</CardDescription>
-          </CardHeader>
+          </Header>
           <CardContent>
             <p className="text-muted-foreground">Fique ligado para mais funcionalidades avançadas de acompanhamento de progresso!</p>
           </CardContent>
@@ -302,4 +312,3 @@ export default function ProgressTrackingPage() {
     </AppLayout>
   );
 }
-
