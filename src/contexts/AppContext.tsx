@@ -17,6 +17,7 @@ interface AppContextType {
   updateSessionExercisePerformance: (sessionId: string, exerciseId: string, updates: Partial<SessionExercisePerformance>) => void;
   markGlobalWarmupAsCompleted: (sessionId: string) => void;
   completeSession: (sessionId: string) => void;
+  deleteSession: (sessionId: string) => void; // Nova função
   hasActiveSession: (workoutId: string) => boolean;
   getLastUsedWeightForExercise: (workoutId: string, exerciseId: string) => string | undefined;
 
@@ -187,6 +188,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       )
     );
   };
+
+  const deleteSession = (sessionId: string) => {
+    setSessions(prev => prev.filter(s => s.id !== sessionId));
+  };
   
   const getLastUsedWeightForExercise = useCallback((workoutId: string, exerciseId: string): string | undefined => {
     const relevantSessions = sessions
@@ -218,6 +223,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updateSessionExercisePerformance,
     markGlobalWarmupAsCompleted,
     completeSession,
+    deleteSession, // Adicionada ao valor do contexto
     hasActiveSession,
     getLastUsedWeightForExercise,
     userSettings,
