@@ -2,7 +2,7 @@
 'use client';
 
 import type { ModelExercise, Exercise, Workout, UserSettings } from './types';
-import { modelExerciseData } from './model-exercises';
+import { modelExerciseData } from './model-exercises'; // Atualizado para o novo caminho
 import { muscleGroupSuggestedFrequencies } from './muscle-group-frequencies';
 import { startOfToday, addDays } from 'date-fns';
 
@@ -137,7 +137,7 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
       { group: 'Abdômen', count: 2 },
       { group: 'Lombar', count: 1 },
     ],
-    hasGlobalWarmup: true, // Usually no global warmup before core, but can be on a separate day
+    hasGlobalWarmup: true, 
   },
   "CoreEAcessorios_Mini": {
     name: "Treino Modelo - Core e Acessórios [ Mini ]",
@@ -246,24 +246,21 @@ export function generateWorkoutFromTemplate(
   let suggestedDeadlineISO: string | undefined = undefined;
   const today = startOfToday();
 
-  if (templateKey.includes("_Mini")) {
-    const majorMuscleGroups = [
+  const majorMuscleGroupsForMini = [
       'Peito', 'Costas', 
       'Pernas (Quadríceps)', 'Pernas (Posteriores)', 'Glúteos', 
-      'Lombar'
+      'Lombar' 
     ];
-    let calculatedRepeatFrequency = 1; // Default para mini (músculos menores)
 
+  if (templateKey.includes("_Mini")) {
+    let calculatedRepeatFrequency = 1; // Default para mini (músculos menores)
     for (const exercise of generatedExercises) {
-        if (exercise.muscleGroups?.some(group => majorMuscleGroups.includes(group))) {
+        if (exercise.muscleGroups?.some(group => majorMuscleGroupsForMini.includes(group))) {
             calculatedRepeatFrequency = 2; // Músculos grandes -> 2 dias
             break;
         }
     }
     suggestedFrequencyDays = calculatedRepeatFrequency;
-    if (suggestedFrequencyDays > 0) {
-        suggestedDeadlineISO = addDays(today, suggestedFrequencyDays).toISOString();
-    }
   } else {
     // Para modelos normais, calcular a frequência máxima sugerida
     let maxSuggestedFrequency = 0;
@@ -278,16 +275,21 @@ export function generateWorkoutFromTemplate(
     });
     if (maxSuggestedFrequency > 0) {
       suggestedFrequencyDays = maxSuggestedFrequency;
-      suggestedDeadlineISO = addDays(today, suggestedFrequencyDays).toISOString();
     }
   }
+
+  if (suggestedFrequencyDays && suggestedFrequencyDays > 0) {
+    suggestedDeadlineISO = addDays(today, suggestedFrequencyDays).toISOString();
+  }
+
 
   const workoutData: Omit<Workout, 'id'> = {
     name: template.name,
     description: template.description,
     exercises: generatedExercises,
     hasGlobalWarmup: template.hasGlobalWarmup !== undefined ? template.hasGlobalWarmup : true,
-    // repeatFrequencyDays and deadline will be set based on user choice in the modal
+    repeatFrequencyDays: undefined, // Será definido pelo usuário no modal
+    deadline: undefined, // Será definido pelo usuário no modal
   };
 
   return {

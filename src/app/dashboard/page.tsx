@@ -5,7 +5,7 @@ import { AppLayout } from '@/components/layout/app-layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { LibraryBig, TrendingUp, Settings, Save } from 'lucide-react';
+import { LibraryBig, TrendingUp, Settings, Save, Dumbbell, BarChartHorizontalBig } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -14,7 +14,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import type { UserSettings } from '@/lib/types';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
+import { startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 const userSettingsSchema = z.object({
   defaultSets: z.coerce.number().min(1, "Séries devem ser pelo menos 1."),
@@ -23,8 +25,12 @@ const userSettingsSchema = z.object({
 
 type UserSettingsFormData = z.infer<typeof userSettingsSchema>;
 
+interface WeeklyMuscleSummary {
+  [groupName: string]: number;
+}
+
 export default function DashboardPage() {
-  const { workouts, sessions, userSettings, updateUserSettings } = useAppContext();
+  const { workouts, sessions, userSettings, updateUserSettings, getWorkoutById } = useAppContext();
   const { toast } = useToast();
 
   const settingsForm = useForm<UserSettingsFormData>({
@@ -50,6 +56,36 @@ export default function DashboardPage() {
     });
   }, [userSettings, settingsForm]);
 
+  const weeklyMuscleGroupSummary = useMemo(() => {
+    const today = new Date();
+    const weekStart = startOfWeek(today, { weekStartsOn: 1, locale: ptBR }); // Segunda-feira
+    const weekEnd = endOfWeek(today, { weekStartsOn: 1, locale: ptBR });     // Domingo
+
+    const summary: WeeklyMuscleSummary = {};
+
+    const completedSessionsThisWeek = sessions.filter(session => {
+      const sessionDate = parseISO(session.date);
+      return session.isCompleted && isWithinInterval(sessionDate, { start: weekStart, end: weekEnd });
+    });
+
+    completedSessionsThisWeek.forEach(session => {
+      const workoutDetails = getWorkoutById(session.workoutId);
+      if (workoutDetails) {
+        session.exercisePerformances.forEach(perf => {
+          if (perf.isExerciseCompleted) {
+            const exerciseInWorkout = workoutDetails.exercises.find(ex => ex.id === perf.exerciseId);
+            if (exerciseInWorkout && exerciseInWorkout.muscleGroups) {
+              exerciseInWorkout.muscleGroups.forEach(group => {
+                summary[group] = (summary[group] || 0) + exerciseInWorkout.sets;
+              });
+            }
+          }
+        });
+      }
+    });
+    return summary;
+  }, [sessions, getWorkoutById]);
+
 
   return (
     <AppLayout>
@@ -59,7 +95,9 @@ export default function DashboardPage() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           <Card>
             <CardHeader>
-              <CardTitle className="font-headline text-xl">Bem-vindo ao Workout Forge!</CardTitle>
+              <CardTitle className="font-headline text-xl flex items-center gap-2">
+                 <Dumbbell className="text-primary"/> Bem-vindo ao Workout Forge!
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-4">
@@ -101,7 +139,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="lg:col-span-1">
+          <Card className="md:col-span-2 lg:col-span-1">
             <CardHeader>
               <CardTitle className="font-headline text-xl flex items-center gap-2">
                 <Settings className="text-primary" />
@@ -146,6 +184,32 @@ export default function DashboardPage() {
                 </CardFooter>
               </form>
             </Form>
+          </Card>
+
+           <Card className="md:col-span-2 lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="font-headline text-xl flex items-center gap-2">
+                <BarChartHorizontalBig className="text-primary" />
+                Resumo Semanal de Séries (Exercícios Concluídos)
+              </CardTitle>
+              <CardDescription>Total de séries por grupo muscular realizadas em treinos concluídos esta semana (Seg-Dom).</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {Object.keys(weeklyMuscleGroupSummary).length > 0 ? (
+                <ul className="space-y-1 text-sm text-muted-foreground grid grid-cols-2 md:grid-cols-3 gap-x-4">
+                  {Object.entries(weeklyMuscleGroupSummary)
+                    .sort(([groupA], [groupB]) => groupA.localeCompare(groupB))
+                    .map(([group, count]) => (
+                    <li key={group} className="flex justify-between">
+                      <span className="font-medium text-foreground">{group}:</span> 
+                      <span>{count} séries</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-muted-foreground italic">Nenhuma série de exercícios concluídos registrada esta semana.</p>
+              )}
+            </CardContent>
           </Card>
         </div>
       </div>
