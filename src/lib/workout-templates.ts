@@ -2,7 +2,7 @@
 'use client';
 
 import type { ModelExercise, Exercise, Workout, UserSettings } from './types';
-import { modelExerciseData } from './model-exercises/index'; // Corrigido para o novo caminho do diretório
+import { modelExerciseData } from './model-exercises/index';
 import { muscleGroupSuggestedFrequencies } from './muscle-group-frequencies';
 import { startOfToday, addDays } from 'date-fns';
 
@@ -15,23 +15,42 @@ function shuffleArray<T>(array: T[]): T[] {
   return array;
 }
 
+const exercisesWithoutIndividualWarmup = [
+  'Prancha Abdominal',
+  'Alongamento (Geral)',
+  'Rosca Direta (Barra ou Halteres)',
+  'Rosca Concentrada (Halter)',
+  'Rosca Martelo (Halteres)',
+  'Tríceps Testa (Barra EZ ou Halteres)',
+  'Tríceps Pulley (Corda ou Barra)',
+  'Tríceps Francês (Halter, Barra EZ ou Barra)',
+  'Antebraço Barra (Rosca de Punho)',
+  'Rosca Zottman',
+  'Elevação Lateral (Halteres)',
+  'Elevação Frontal (Halteres ou Anilha)',
+  'Crucifixo Invertido (Halteres ou Máquina)',
+  'Encolhimento de Ombros (Halteres ou Barra)',
+  'Desenvolvimento Arnold (Halteres)',
+  'Desenvolvimento Máquina', // Adicionado para ser considerado sem warmup individual
+  'Abdominal Supra (Crunch)',
+  'Abdominal Infra (Elevação de Pernas)',
+  'Abdominal Oblíquo (Bicicleta)',
+  'Cadeira de Lombar (Hiperextensão)',
+];
+
 function determineModelExerciseWarmup(exerciseDetails?: ModelExercise): boolean {
-  if (!exerciseDetails) return true;
+  if (!exerciseDetails) return true; 
+
   const nameLower = exerciseDetails.name.toLowerCase();
   const isCardio = exerciseDetails.muscleGroups.includes('Cardio');
   const isHIIT = nameLower.includes('hiit');
 
-  if (nameLower === 'prancha abdominal' || nameLower === 'alongamento (geral)' || (isCardio && !isHIIT)) {
-    return false;
-  }
-  // For Core/Accessory specific exercises, generally no specific warmup step in the template
-  if (['Abdômen', 'Lombar', 'Antebraço'].some(coreGroup => exerciseDetails.muscleGroups.includes(coreGroup)) &&
-      !exerciseDetails.muscleGroups.some(majorGroup => ['Peito', 'Costas', 'Pernas (Quadríceps)', 'Pernas (Posteriores)', 'Glúteos', 'Ombros'].includes(majorGroup))
-  ) {
-    return false;
-  }
-  return true;
+  if (isCardio && !isHIIT) return false; 
+  if (exercisesWithoutIndividualWarmup.includes(exerciseDetails.name)) return false;
+  
+  return true; 
 }
+
 
 const generateId = () => crypto.randomUUID();
 
@@ -67,17 +86,17 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
   },
   "Braços": {
     name: "Treino Modelo - Braços",
-    description: "Um treino focado em bíceps, tríceps e antebraços.",
+    description: "Um treino focado em bíceps, tríceps e antebraços (exercícios isolados).",
     targetMuscleGroups: [
       { group: 'Bíceps', count: 2 },
       { group: 'Tríceps', count: 2 },
-      { group: 'Antebraço', count: 1 }, // Ajustado para 1 para mais foco, pode ser 2
+      { group: 'Antebraço', count: 1 },
     ],
     hasGlobalWarmup: true,
   },
   "Braços_Mini": {
     name: "Treino Modelo - Braços [ Mini ]",
-    description: "Versão compacta do treino de Braços, com foco em um exercício para bíceps, tríceps e antebraço.",
+    description: "Versão compacta do treino de Braços, com um exercício isolado para bíceps, tríceps e antebraço.",
     targetMuscleGroups: [
       { group: 'Bíceps', count: 1 },
       { group: 'Tríceps', count: 1 },
@@ -87,16 +106,16 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
   },
   "Ombros": {
     name: "Treino Modelo - Ombros e Trapézio",
-    description: "Um treino para desenvolver deltoides e trapézio.",
+    description: "Um treino para desenvolver deltoides e trapézio (exercícios isolados/semi-isolados).",
     targetMuscleGroups: [
-      { group: 'Ombros', count: 2 },
+      { group: 'Ombros', count: 2 }, // e.g., 1 desenvolvimento leve + 1 elevação
       { group: 'Trapézio', count: 1 },
     ],
     hasGlobalWarmup: true,
   },
   "Ombros_Mini": {
     name: "Treino Modelo - Ombros e Trapézio [ Mini ]",
-    description: "Versão compacta para deltoides e trapézio, com um exercício chave para cada.",
+    description: "Versão compacta para deltoides e trapézio, com um exercício chave (isolado/semi-isolado) para cada.",
     targetMuscleGroups: [
       { group: 'Ombros', count: 1 },
       { group: 'Trapézio', count: 1 },
@@ -115,7 +134,7 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
     name: "Treino Modelo - Peitoral [ Mini ]",
     description: "Versão compacta para o desenvolvimento do peitoral, com um exercício principal.",
     targetMuscleGroups: [
-      { group: 'Peito', count: 1 }, // Poderia ser 2 para um mini mais focado
+      { group: 'Peito', count: 1 },
     ],
     hasGlobalWarmup: true,
   },
@@ -131,7 +150,7 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
     name: "Treino Modelo - Costas [ Mini ]",
     description: "Versão compacta para as costas, com um exercício fundamental.",
     targetMuscleGroups: [
-      { group: 'Costas', count: 1 }, // Poderia ser 2
+      { group: 'Costas', count: 1 },
     ],
     hasGlobalWarmup: true,
   },
@@ -162,11 +181,9 @@ interface GeneratedWorkoutOutput {
   suggestedDeadlineISO?: string;
 }
 
-
-// Define specific lists of appropriate exercises for Core & Accessories templates
 const coreSpecificAbdominalExercises: ModelExercise[] = modelExerciseData['Outros'].filter(ex =>
-  ex.muscleGroups.includes('Abdômen') && !ex.name.includes('Flexão de Braço') && !ex.name.includes('Agachamento')
-); // e.g., Prancha, Supra, Infra, Oblíquo
+  ex.muscleGroups.includes('Abdômen') && !ex.name.includes('Flexão de Braço') && !ex.name.includes('Agachamento') && !ex.name.includes('Cadeira de Lombar')
+);
 
 const coreSpecificLombarExercises: ModelExercise[] = modelExerciseData['Outros'].filter(ex =>
   ex.name === 'Cadeira de Lombar (Hiperextensão)'
@@ -174,6 +191,26 @@ const coreSpecificLombarExercises: ModelExercise[] = modelExerciseData['Outros']
 
 const coreSpecificAntebracoExercises: ModelExercise[] = modelExerciseData['Braços'].filter(ex =>
   ex.muscleGroups.includes('Antebraço') && (ex.name === 'Antebraço Barra (Rosca de Punho)' || ex.name === 'Rosca Zottman')
+);
+
+// --- Listas para Braços (Isolados) ---
+const isolatedBicepsExercises: ModelExercise[] = modelExerciseData['Braços'].filter(ex =>
+  ["Rosca Direta (Barra ou Halteres)", "Rosca Concentrada (Halter)", "Rosca Martelo (Halteres)"].includes(ex.name)
+);
+const isolatedTricepsExercises: ModelExercise[] = modelExerciseData['Braços'].filter(ex =>
+  ["Tríceps Testa (Barra EZ ou Halteres)", "Tríceps Pulley (Corda ou Barra)", "Tríceps Francês (Halter, Barra EZ ou Barra)"].includes(ex.name)
+);
+// Antebraço já coberto por coreSpecificAntebracoExercises
+
+// --- Listas para Ombros (Isolados/Semi-Isolados) ---
+const isolatedShoulderPressExercises: ModelExercise[] = modelExerciseData['Ombros'].filter(ex => 
+  ["Desenvolvimento Arnold (Halteres)", "Desenvolvimento Máquina"].includes(ex.name)
+);
+const isolatedShoulderRaisesAndFlyes: ModelExercise[] = modelExerciseData['Ombros'].filter(ex =>
+  ["Elevação Lateral (Halteres)", "Elevação Frontal (Halteres ou Anilha)", "Crucifixo Invertido (Halteres ou Máquina)"].includes(ex.name)
+);
+const isolatedTrapeziusExercises: ModelExercise[] = modelExerciseData['Ombros'].filter(ex =>
+  ["Encolhimento de Ombros (Halteres ou Barra)"].includes(ex.name)
 );
 
 
@@ -190,7 +227,7 @@ export function generateWorkoutFromTemplate(
 
   const generatedExercises: Exercise[] = [];
   const usedExerciseNamesInCurrentWorkout = new Set<string>();
-  const assignedWarmupForGroup = new Set<string>(); // Track if warmup assigned for a group
+  const assignedWarmupForGroup = new Set<string>();
 
   const allExistingExerciseNames = new Set<string>();
   existingWorkouts.forEach(workout => {
@@ -198,23 +235,34 @@ export function generateWorkoutFromTemplate(
   });
 
   const isCoreTemplate = templateKey.startsWith("CoreEAcessorios");
+  const isArmsTemplate = templateKey.startsWith("Braços");
+  const isShouldersTemplate = templateKey.startsWith("Ombros");
 
   template.targetMuscleGroups.forEach(target => {
     let exercisesForThisGroupTarget: ModelExercise[] = [];
     let candidatePool: ModelExercise[];
 
     if (isCoreTemplate) {
-      if (target.group === 'Abdômen') {
-        candidatePool = [...coreSpecificAbdominalExercises];
-      } else if (target.group === 'Lombar') {
-        candidatePool = [...coreSpecificLombarExercises];
-      } else if (target.group === 'Antebraço') {
-        candidatePool = [...coreSpecificAntebracoExercises];
-      } else {
-        candidatePool = []; // Should not happen if template is defined correctly
+      if (target.group === 'Abdômen') candidatePool = [...coreSpecificAbdominalExercises];
+      else if (target.group === 'Lombar') candidatePool = [...coreSpecificLombarExercises];
+      else if (target.group === 'Antebraço') candidatePool = [...coreSpecificAntebracoExercises];
+      else candidatePool = [];
+    } else if (isArmsTemplate) {
+      if (target.group === 'Bíceps') candidatePool = [...isolatedBicepsExercises];
+      else if (target.group === 'Tríceps') candidatePool = [...isolatedTricepsExercises];
+      else if (target.group === 'Antebraço') candidatePool = [...coreSpecificAntebracoExercises];
+      else candidatePool = [];
+    } else if (isShouldersTemplate) {
+      if (target.group === 'Ombros') {
+        // Para "Ombros Mini" (count 1), misturar leves e elevações
+        // Para "Ombros" normal (count 2), pode ser 1 desenvolvimento leve + 1 elevação,
+        // ou simplesmente misturar e pegar 2. Vamos misturar por simplicidade.
+        candidatePool = shuffleArray([...isolatedShoulderPressExercises, ...isolatedShoulderRaisesAndFlyes]);
       }
+      else if (target.group === 'Trapézio') candidatePool = [...isolatedTrapeziusExercises];
+      else candidatePool = [];
     } else {
-      // Original logic for non-core templates
+      // Lógica original para outros templates (Peitoral, Costas, Pernas)
       candidatePool = Object.values(modelExerciseData).flat().filter(modelEx =>
         modelEx.muscleGroups.includes(target.group)
       );
@@ -222,9 +270,10 @@ export function generateWorkoutFromTemplate(
     
     let candidates = candidatePool.filter(modelEx => !usedExerciseNamesInCurrentWorkout.has(modelEx.name));
     
-    // Simple sort to prefer more "specific" exercises (fewer muscle groups listed)
-    // This helps but isn't a perfect solution for all cases.
-    candidates.sort((a, b) => a.muscleGroups.length - b.muscleGroups.length);
+    if (!isCoreTemplate && !isArmsTemplate && !isShouldersTemplate) { // Aplicar ordenação por especificidade apenas para compostos
+        candidates.sort((a, b) => a.muscleGroups.length - b.muscleGroups.length);
+    }
+
 
     const brandNewCandidates = candidates.filter(c => !allExistingExerciseNames.has(c.name));
     const existingElsewhereCandidates = candidates.filter(c => allExistingExerciseNames.has(c.name));
@@ -252,6 +301,19 @@ export function generateWorkoutFromTemplate(
         }
     }
     
+    if (exercisesForThisGroupTarget.length < target.count && candidatePool.length > 0) {
+      // If still not enough, and there are candidates, pick from them even if already used in current workout (should be rare)
+      const remainingCandidates = candidatePool.filter(c => !usedExerciseNamesInCurrentWorkout.has(c.name));
+      shuffleArray(remainingCandidates);
+      for (const newEx of remainingCandidates) {
+          if (needed === 0) break;
+          exercisesForThisGroupTarget.push(newEx);
+          usedExerciseNamesInCurrentWorkout.add(newEx.name);
+          needed--;
+      }
+    }
+
+
     if (exercisesForThisGroupTarget.length < target.count) {
       console.warn(`Não foram encontrados exercícios suficientes para o grupo ${target.group} no modelo ${templateKey} após considerar os existentes. Encontrados: ${exercisesForThisGroupTarget.length}, Pedidos: ${target.count}`);
     }
@@ -259,13 +321,15 @@ export function generateWorkoutFromTemplate(
     exercisesForThisGroupTarget.forEach(modelEx => {
       let exerciseSpecificWarmup = determineModelExerciseWarmup(modelEx);
 
-      // For multi-exercise groups, only assign specific warmup to a limited number (e.g., first one)
-      if (exerciseSpecificWarmup && target.count > 1) {
+      if (exerciseSpecificWarmup && target.count > 1 && !isCoreTemplate && !isArmsTemplate && !isShouldersTemplate) {
         if (assignedWarmupForGroup.has(target.group)) {
-          exerciseSpecificWarmup = false; // Warmup already assigned for one exercise in this group
+          exerciseSpecificWarmup = false; 
         } else {
           assignedWarmupForGroup.add(target.group);
         }
+      } else if (isCoreTemplate || isArmsTemplate || isShouldersTemplate) {
+        // For these specific templates, individual warmups are generally off due to determineModelExerciseWarmup
+        // unless a very specific exercise overrides it.
       }
 
 
@@ -286,22 +350,24 @@ export function generateWorkoutFromTemplate(
       console.warn(`Nenhum exercício gerado para o modelo: ${templateKey}`);
   }
 
-  // Logic for suggestedFrequencyDays and suggestedDeadlineISO
   let suggestedFrequencyDays: number | undefined = undefined;
   let suggestedDeadlineISO: string | undefined = undefined;
   const today = startOfToday();
 
+  const majorMuscleGroupsForFrequency = [
+    'Peito', 'Costas', 
+    'Pernas (Quadríceps)', 'Pernas (Posteriores)', 'Glúteos', 
+    'Lombar'
+  ];
+
   if (templateKey.includes("_Mini")) {
-    const majorMuscleGroupsInMini = [
-      'Peito', 'Costas', 
-      'Pernas (Quadríceps)', 'Pernas (Posteriores)', 'Glúteos', 
-      'Lombar' // Consider Lombar as major for this specific calculation
-    ];
     const hasMajorMuscle = generatedExercises.some(ex => 
-        ex.muscleGroups?.some(group => majorMuscleGroupsInMini.includes(group))
+        ex.muscleGroups?.some(group => majorMuscleGroupsForFrequency.includes(group))
     );
     suggestedFrequencyDays = hasMajorMuscle ? 2 : 1;
-  } else if (!isCoreTemplate) { // Normal (non-mini, non-core) templates
+  } else if (isCoreTemplate || isArmsTemplate || isShouldersTemplate) {
+      suggestedFrequencyDays = 2; // Default for core, arms, shoulders (non-mini) workouts
+  } else { 
     let maxSuggestedFrequency = 0;
     generatedExercises.forEach(exercise => {
       if (exercise.muscleGroups && exercise.muscleGroups.length > 0) {
@@ -315,10 +381,7 @@ export function generateWorkoutFromTemplate(
     if (maxSuggestedFrequency > 0) {
       suggestedFrequencyDays = maxSuggestedFrequency;
     }
-  } else { // Core templates (non-mini and mini)
-      suggestedFrequencyDays = 2; // Default for core workouts, can be adjusted
   }
-
 
   if (suggestedFrequencyDays && suggestedFrequencyDays > 0) {
     suggestedDeadlineISO = addDays(today, suggestedFrequencyDays).toISOString();
@@ -329,8 +392,9 @@ export function generateWorkoutFromTemplate(
     name: template.name,
     description: template.description,
     exercises: generatedExercises,
-    hasGlobalWarmup: template.hasGlobalWarmup !== undefined ? template.hasGlobalWarmup : (isCoreTemplate ? false : true), // Default global warmup false for core
-    repeatFrequencyDays: undefined,
+    hasGlobalWarmup: template.hasGlobalWarmup !== undefined ? template.hasGlobalWarmup : 
+                     (isCoreTemplate ? false : true),
+    repeatFrequencyDays: undefined, 
     deadline: undefined, 
   };
 
@@ -340,3 +404,6 @@ export function generateWorkoutFromTemplate(
     suggestedDeadlineISO,
   };
 }
+
+
+    
