@@ -38,6 +38,17 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
     ],
     hasGlobalWarmup: false,
   },
+  "Pernas_Mini": {
+    name: "Treino Modelo - Pernas [ Mini ]",
+    description: "Versão compacta do treino de Pernas, com um exercício por grupo muscular principal.",
+    targetMuscleGroups: [
+      { group: 'Pernas (Quadríceps)', count: 1 },
+      { group: 'Pernas (Posteriores)', count: 1 },
+      { group: 'Glúteos', count: 1 },
+      { group: 'Panturrilhas', count: 1 },
+    ],
+    hasGlobalWarmup: false,
+  },
   "Braços": {
     name: "Treino Modelo - Braços",
     description: "Um treino focado em bíceps, tríceps e antebraços.",
@@ -48,12 +59,31 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
     ],
     hasGlobalWarmup: true,
   },
+  "Braços_Mini": {
+    name: "Treino Modelo - Braços [ Mini ]",
+    description: "Versão compacta do treino de Braços, com foco em um exercício para bíceps, tríceps e antebraço.",
+    targetMuscleGroups: [
+      { group: 'Bíceps', count: 1 },
+      { group: 'Tríceps', count: 1 },
+      { group: 'Antebraço', count: 1 },
+    ],
+    hasGlobalWarmup: true,
+  },
   "Ombros": {
     name: "Treino Modelo - Ombros e Trapézio",
     description: "Um treino para desenvolver deltoides e trapézio.",
     targetMuscleGroups: [
       { group: 'Ombros', count: 2 },
-      { group: 'Trapézio', count: 1 }, 
+      { group: 'Trapézio', count: 1 },
+    ],
+    hasGlobalWarmup: true,
+  },
+  "Ombros_Mini": {
+    name: "Treino Modelo - Ombros e Trapézio [ Mini ]",
+    description: "Versão compacta para deltoides e trapézio, com um exercício chave para cada.",
+    targetMuscleGroups: [
+      { group: 'Ombros', count: 1 },
+      { group: 'Trapézio', count: 1 },
     ],
     hasGlobalWarmup: true,
   },
@@ -61,7 +91,15 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
     name: "Treino Modelo - Peitoral",
     description: "Um treino focado no desenvolvimento do peitoral.",
     targetMuscleGroups: [
-      { group: 'Peito', count: 3 }, 
+      { group: 'Peito', count: 3 },
+    ],
+    hasGlobalWarmup: true,
+  },
+  "Peitoral_Mini": {
+    name: "Treino Modelo - Peitoral [ Mini ]",
+    description: "Versão compacta para o desenvolvimento do peitoral, com um exercício principal.",
+    targetMuscleGroups: [
+      { group: 'Peito', count: 1 },
     ],
     hasGlobalWarmup: true,
   },
@@ -69,15 +107,32 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
     name: "Treino Modelo - Costas",
     description: "Um treino para construir costas largas e densas.",
     targetMuscleGroups: [
-      { group: 'Costas', count: 3 }, 
+      { group: 'Costas', count: 3 },
     ],
     hasGlobalWarmup: true,
   },
-  "Core e Acessórios": {
+  "Costas_Mini": {
+    name: "Treino Modelo - Costas [ Mini ]",
+    description: "Versão compacta para as costas, com um exercício fundamental.",
+    targetMuscleGroups: [
+      { group: 'Costas', count: 1 },
+    ],
+    hasGlobalWarmup: true,
+  },
+  "CoreEAcessorios": { // Chave alterada para evitar espaços e caracteres especiais
     name: "Treino Modelo - Core e Acessórios",
     description: "Exercícios para fortalecer o abdômen e lombar.",
     targetMuscleGroups: [
       { group: 'Abdômen', count: 2 },
+      { group: 'Lombar', count: 1 },
+    ],
+    hasGlobalWarmup: true,
+  },
+  "CoreEAcessorios_Mini": {
+    name: "Treino Modelo - Core e Acessórios [ Mini ]",
+    description: "Versão compacta para fortalecer abdômen e lombar, com um exercício para cada.",
+    targetMuscleGroups: [
+      { group: 'Abdômen', count: 1 },
       { group: 'Lombar', count: 1 },
     ],
     hasGlobalWarmup: true,
@@ -99,15 +154,17 @@ export function generateWorkoutFromTemplate(
   const assignedWarmupForGroup = new Set<string>(); // Tracks groups that got a warmup exercise
 
   template.targetMuscleGroups.forEach(target => {
+    // Prioritize exercises where the target group is listed first
     let modelExercisesForGroup = Object.values(modelExerciseData)
       .flat()
       .filter(ex => ex.muscleGroups.includes(target.group) && !usedExerciseNames.has(ex.name) && ex.muscleGroups[0] === target.group);
 
+    // If not enough primary exercises, get any exercise that includes the target group
     if (modelExercisesForGroup.length < target.count) {
         const additionalExercises = Object.values(modelExerciseData)
             .flat()
             .filter(ex => ex.muscleGroups.includes(target.group) && !usedExerciseNames.has(ex.name) && !modelExercisesForGroup.some(me => me.name === ex.name));
-        modelExercisesForGroup = [...modelExercisesForGroup, ...additionalExercises];
+        modelExercisesForGroup = [...modelExercisesForGroup, ...additionalExercises.filter(addEx => !modelExercisesForGroup.find(me => me.name === addEx.name))]; // Ensure no duplicates if already added
     }
     
     const shuffled = modelExercisesForGroup.sort(() => 0.5 - Math.random());
@@ -119,10 +176,12 @@ export function generateWorkoutFromTemplate(
 
     selectedExercises.forEach(modelEx => {
       let exerciseSpecificWarmup = false;
-      if (determineModelExerciseWarmup(modelEx)) { // Check if this exercise type *can* have a warmup
-        if (!assignedWarmupForGroup.has(target.group)) { // Is this the first exercise for this group getting a warmup?
+      // Determine if this exercise type should have a warmup
+      if (determineModelExerciseWarmup(modelEx)) {
+        // For Mini templates (count: 1) or the first eligible exercise in a normal template for that group
+        if (target.count === 1 || !assignedWarmupForGroup.has(target.group)) {
           exerciseSpecificWarmup = true;
-          assignedWarmupForGroup.add(target.group);
+          assignedWarmupForGroup.add(target.group); // Mark that this group has received a warmup exercise
         }
       }
 
@@ -134,7 +193,7 @@ export function generateWorkoutFromTemplate(
         weight: modelEx.defaultWeight || '',
         muscleGroups: modelEx.muscleGroups,
         notes: modelEx.description,
-        hasWarmup: exerciseSpecificWarmup, // Apply determined warmup state
+        hasWarmup: exerciseSpecificWarmup,
       });
       usedExerciseNames.add(modelEx.name);
     });
@@ -142,7 +201,14 @@ export function generateWorkoutFromTemplate(
 
   if (exercises.length === 0) {
       console.warn(`Nenhum exercício gerado para o modelo: ${templateKey}`);
-      return null;
+      // Return a workout with an empty exercise list instead of null if the template itself exists
+      // This might be better for UI handling if a template is valid but finds no exercises
+      return {
+        name: template.name,
+        description: template.description,
+        exercises: [],
+        hasGlobalWarmup: template.hasGlobalWarmup !== undefined ? template.hasGlobalWarmup : true,
+      };
   }
 
   return {
