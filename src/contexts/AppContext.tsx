@@ -16,8 +16,9 @@ interface AppContextType {
   addSession: (sessionData: Pick<WorkoutSession, 'workoutId' | 'workoutName' | 'date'>) => void;
   updateSessionExercisePerformance: (sessionId: string, exerciseId: string, updates: Partial<SessionExercisePerformance>) => void;
   markGlobalWarmupAsCompleted: (sessionId: string) => void;
+  undoGlobalWarmup: (sessionId: string) => void; // Nova função
   completeSession: (sessionId: string) => void;
-  deleteSession: (sessionId: string) => void; // Nova função
+  deleteSession: (sessionId: string) => void;
   hasActiveSession: (workoutId: string) => boolean;
   getLastUsedWeightForExercise: (workoutId: string, exerciseId: string) => string | undefined;
 
@@ -175,6 +176,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
+  const undoGlobalWarmup = useCallback((sessionId: string) => {
+    setSessions(prevSessions =>
+      prevSessions.map(session => {
+        if (session.id === sessionId) {
+          return {
+            ...session,
+            isGlobalWarmupCompleted: false,
+            notes: (session.notes || '').replace(' Aquecimento geral concluído.', '') + ' Aquecimento geral desfeito.',
+          };
+        }
+        return session;
+      })
+    );
+  }, []);
+
   const completeSession = (sessionId: string) => {
     setSessions(prev =>
       prev.map(session =>
@@ -222,8 +238,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addSession,
     updateSessionExercisePerformance,
     markGlobalWarmupAsCompleted,
+    undoGlobalWarmup, // Adicionada ao valor do contexto
     completeSession,
-    deleteSession, // Adicionada ao valor do contexto
+    deleteSession,
     hasActiveSession,
     getLastUsedWeightForExercise,
     userSettings,
