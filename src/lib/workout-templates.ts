@@ -2,7 +2,7 @@
 'use client';
 
 import type { ModelExercise, Exercise, Workout, UserSettings } from './types';
-import { modelExerciseData } from './model-exercises'; // Atualizado para o novo caminho
+import { modelExerciseData } from './model-exercises/index'; // Corrigido para apontar explicitamente para index.ts
 import { muscleGroupSuggestedFrequencies } from './muscle-group-frequencies';
 import { startOfToday, addDays } from 'date-fns';
 
@@ -137,7 +137,7 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
       { group: 'Abdômen', count: 2 },
       { group: 'Lombar', count: 1 },
     ],
-    hasGlobalWarmup: true, 
+    hasGlobalWarmup: true,
   },
   "CoreEAcessorios_Mini": {
     name: "Treino Modelo - Core e Acessórios [ Mini ]",
@@ -246,7 +246,7 @@ export function generateWorkoutFromTemplate(
   let suggestedDeadlineISO: string | undefined = undefined;
   const today = startOfToday();
 
-  const majorMuscleGroupsForMini = [
+  const majorMuscleGroupsForFrequency = [
       'Peito', 'Costas', 
       'Pernas (Quadríceps)', 'Pernas (Posteriores)', 'Glúteos', 
       'Lombar' 
@@ -255,7 +255,7 @@ export function generateWorkoutFromTemplate(
   if (templateKey.includes("_Mini")) {
     let calculatedRepeatFrequency = 1; // Default para mini (músculos menores)
     for (const exercise of generatedExercises) {
-        if (exercise.muscleGroups?.some(group => majorMuscleGroupsForMini.includes(group))) {
+        if (exercise.muscleGroups?.some(group => majorMuscleGroupsForFrequency.includes(group))) {
             calculatedRepeatFrequency = 2; // Músculos grandes -> 2 dias
             break;
         }
