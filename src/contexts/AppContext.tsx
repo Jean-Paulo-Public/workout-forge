@@ -11,6 +11,7 @@ interface AppContextType {
   updateWorkout: (workout: Workout) => void;
   deleteWorkout: (workoutId: string) => void;
   getWorkoutById: (workoutId: string) => Workout | undefined;
+  updateWorkoutsOrder: (newOrder: Workout[]) => void;
 
   sessions: WorkoutSession[];
   addSession: (sessionData: Pick<WorkoutSession, 'workoutId' | 'workoutName' | 'date'>) => void;
@@ -72,10 +73,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addWorkout = (workoutData: Omit<Workout, 'id'>) => {
     const newWorkout: Workout = {
-      ...workoutData, // Contém name, desc, exercises, repeatFreq, deadline, hasGlobalWarmup
+      ...workoutData, 
       id: generateId(),
-      exercises: workoutData.exercises.map(ex => ({ // Garante IDs para cada exercício
-        ...ex, // Contém name, sets, reps, weight, muscleGroups, notes, hasWarmup
+      exercises: workoutData.exercises.map(ex => ({ 
+        ...ex, 
         id: ex.id || generateId(), 
       })),
     };
@@ -86,7 +87,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setWorkouts((prev) =>
       prev.map((w) => (w.id === updatedWorkout.id ? {
         ...updatedWorkout,
-        // Garantir que os campos opcionais sejam undefined se não presentes
         repeatFrequencyDays: updatedWorkout.repeatFrequencyDays || undefined,
         deadline: updatedWorkout.deadline || undefined,
         hasGlobalWarmup: updatedWorkout.hasGlobalWarmup !== undefined ? updatedWorkout.hasGlobalWarmup : true,
@@ -105,6 +105,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const getWorkoutById = (workoutId: string): Workout | undefined => {
     return workouts.find(w => w.id === workoutId);
+  };
+
+  const updateWorkoutsOrder = (newOrder: Workout[]) => {
+    setWorkouts(newOrder);
   };
 
   const hasActiveSession = (workoutId: string): boolean => {
@@ -134,7 +138,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       isCompleted: false,
       notes: `Sessão de ${sessionData.workoutName} iniciada.`,
       exercisePerformances: initialExercisePerformances,
-      isGlobalWarmupCompleted: workout.hasGlobalWarmup ? false : undefined, // undefined se não aplicável
+      isGlobalWarmupCompleted: workout.hasGlobalWarmup ? false : undefined, 
     };
     setSessions((prev) => [newSession, ...prev]);
   };
@@ -231,6 +235,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updateWorkout,
     deleteWorkout,
     getWorkoutById,
+    updateWorkoutsOrder,
     sessions,
     addSession,
     updateSessionExercisePerformance,
@@ -244,7 +249,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updateUserSettings,
   };
 
-  if (!isMounted) return null; // Ou um loader/skeleton global
+  if (!isMounted) return null; 
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
@@ -256,3 +261,5 @@ export function useAppContext() {
   }
   return context;
 }
+
+    
