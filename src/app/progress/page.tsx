@@ -170,7 +170,7 @@ export default function ProgressTrackingPage() {
                             </p>
                             {session.notes && <p className="text-xs italic mt-1 text-muted-foreground">{session.notes}</p>}
                           </div>
-                          <div className="flex items-center gap-2 mt-2 sm:mt-0 flex-shrink-0">
+                          <div className="flex flex-wrap items-center sm:flex-nowrap justify-start sm:justify-end gap-2 mt-2 sm:mt-0 w-full sm:w-auto">
                             {!session.isCompleted && !isWorkoutDeleted ? (
                               <>
                                 {hasGlobalWarmup && !session.isGlobalWarmupCompleted && (
@@ -183,6 +183,18 @@ export default function ProgressTrackingPage() {
                                     <Flame className="mr-2 h-4 w-4 text-orange-500" /> Concluir Aquecimento
                                   </Button>
                                 )}
+                                
+                                {(!hasGlobalWarmup || session.isGlobalWarmupCompleted) && (
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    onClick={() => openTrackWorkoutModal(session)}
+                                    className="whitespace-nowrap"
+                                  >
+                                    <PlayCircle className="mr-2 h-4 w-4 text-primary-foreground" /> Acompanhar
+                                  </Button>
+                                )}
+
                                 {hasGlobalWarmup && session.isGlobalWarmupCompleted && (
                                    <Button
                                     size="sm"
@@ -194,26 +206,8 @@ export default function ProgressTrackingPage() {
                                     <Undo2 className="mr-2 h-4 w-4" /> Desfazer Aquecimento
                                   </Button>
                                 )}
-                                {(!hasGlobalWarmup || session.isGlobalWarmupCompleted) && (
-                                  <Button
-                                    size="sm"
-                                    variant="default"
-                                    onClick={() => openTrackWorkoutModal(session)}
-                                    className="whitespace-nowrap"
-                                  >
-                                    <PlayCircle className="mr-2 h-4 w-4 text-primary-foreground" /> Acompanhar
-                                  </Button>
-                                )}
-                              </>
-                            ) : (
-                              session.isCompleted && (
-                                <span className="text-xs text-green-600 font-medium flex items-center whitespace-nowrap">
-                                  <CheckCircle2 className="mr-1 h-4 w-4" /> Concluído
-                                </span>
-                              )
-                            )}
-                            {!session.isCompleted && (
-                               <AlertDialog>
+                               
+                                <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <Button
                                     variant="destructive"
@@ -241,6 +235,13 @@ export default function ProgressTrackingPage() {
                                   </AlertDialogContent>
                                 )}
                               </AlertDialog>
+                              </>
+                            ) : (
+                              session.isCompleted && (
+                                <span className="text-xs text-green-600 font-medium flex items-center whitespace-nowrap">
+                                  <CheckCircle2 className="mr-1 h-4 w-4" /> Concluído
+                                </span>
+                              )
                             )}
                           </div>
                         </div>
@@ -301,3 +302,4 @@ export default function ProgressTrackingPage() {
     </AppLayout>
   );
 }
+
