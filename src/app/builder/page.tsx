@@ -162,7 +162,7 @@ export default function WorkoutBuilderPage() {
       const currentFrequencyField = form.getValues('repeatFrequencyDays');
       const currentFrequency = currentFrequencyField === '' || currentFrequencyField === undefined ? 0 : Number(currentFrequencyField);
 
-      if (currentFrequency === 0 || currentFrequency < maxSuggestedFrequency) {
+      if (currentFrequency === 0 && maxSuggestedFrequency > 0) {
          form.setValue('repeatFrequencyDays', maxSuggestedFrequency, { shouldDirty: true });
       }
     }
