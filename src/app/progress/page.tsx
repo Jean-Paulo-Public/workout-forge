@@ -12,7 +12,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useCallback, useId, useMemo } from 'react';
 import type { Workout, WorkoutSession, SessionExercisePerformance } from '@/lib/types';
-import { DeadlineUpdateModal } from '@/components/DeadlineUpdateModal';
+// import { DeadlineUpdateModal } from '@/components/DeadlineUpdateModal'; // Commented out as handlers are removed
 import { TrackWorkoutModal } from '@/components/TrackWorkoutModal';
 import {
   AlertDialog,
@@ -26,47 +26,50 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-const PlaceholderChart = () => (
-  <div className="w-full h-64 bg-muted rounded-md flex items-center justify-center">
-    <BarChart3 className="h-16 w-16 text-muted-foreground" />
-    <p className="ml-2 text-muted-foreground">Gráfico em Breve</p>
-  </div>
-);
+
+/* // PlaceholderChart commented out
+const PlaceholderChart = () => {
+  return ( // Explicit return
+    <div className="w-full h-64 bg-muted rounded-md flex items-center justify-center">
+      <BarChart3 className="h-16 w-16 text-muted-foreground" />
+      <p className="ml-2 text-muted-foreground">Gráfico em Breve (PlaceholderChart comentado)</p>
+    </div>
+  );
+};
+*/
 
 export default function ProgressTrackingPage() {
-  const { sessions, getWorkoutById, updateWorkout, markGlobalWarmupAsCompleted, undoGlobalWarmup, deleteSession } = useAppContext();
+  const { sessions, getWorkoutById, /*updateWorkout, markGlobalWarmupAsCompleted, undoGlobalWarmup, deleteSession*/ } = useAppContext();
   const { toast } = useToast();
-  const [workoutToUpdateDeadline, setWorkoutToUpdateDeadline] = useState<Workout | null>(null);
-  const [sessionToDelete, setSessionToDelete] = useState<WorkoutSession | null>(null);
-  const deleteDialogDescriptionId = useId();
+  // const [workoutToUpdateDeadline, setWorkoutToUpdateDeadline] = useState<Workout | null>(null);
+  // const [sessionToDelete, setSessionToDelete] = useState<WorkoutSession | null>(null);
+  // const deleteDialogDescriptionId = useId();
 
   const [trackingSession, setTrackingSession] = useState<WorkoutSession | null>(null);
   const [isTrackModalOpen, setIsTrackModalOpen] = useState(false);
 
-  const workoutForTrackingModal = trackingSession ? getWorkoutById(trackingSession.workoutId) : undefined;
+  // const workoutForTrackingModal = trackingSession ? getWorkoutById(trackingSession.workoutId) : undefined;
 
-  const sortedSessions = useMemo(() => {
-    return [...sessions].sort((a, b) => {
-      // Prioridade 1: Sessões não concluídas primeiro
-      if (!a.isCompleted && b.isCompleted) {
-        return -1;
-      }
-      if (a.isCompleted && !b.isCompleted) {
-        return 1;
-      }
-      // Se ambas têm o mesmo status de 'isCompleted' (ambas não concluídas ou ambas concluídas)
-      // Ordenar por data mais recente primeiro
-      return new Date(b.date).getTime() - new Date(a.date).getTime();
-    });
-  }, [sessions]);
+  // Simpler version for now
+  const sortedSessions = [...sessions].sort((a, b) => {
+    if (!a.isCompleted && b.isCompleted) {
+      return -1;
+    }
+    if (a.isCompleted && !b.isCompleted) {
+      return 1;
+    }
+    return new Date(b.date).getTime() - new Date(a.date).getTime();
+  });
+
 
   const openTrackWorkoutModal = (session: WorkoutSession) => {
     setTrackingSession(session);
     setIsTrackModalOpen(true);
   };
-
+  
+  /*
   const handleGlobalWarmupCompleted = (sessionId: string, workoutName: string) => {
-    markGlobalWarmupAsCompleted(sessionId);
+    // markGlobalWarmupAsCompleted(sessionId);
     toast({
       title: "Aquecimento Geral Concluído!",
       description: `Aquecimento para ${workoutName} finalizado. Prossiga para os exercícios!`,
@@ -74,51 +77,56 @@ export default function ProgressTrackingPage() {
   };
 
   const handleUndoGlobalWarmup = (sessionId: string, workoutName: string) => {
-    undoGlobalWarmup(sessionId);
+    // undoGlobalWarmup(sessionId);
     toast({
       title: "Aquecimento Geral Desfeito!",
       description: `O estado do aquecimento para ${workoutName} foi revertido.`,
       variant: "default",
     });
   };
+  */
 
   const handleWorkoutFinallyCompleted = useCallback(() => {
     if (trackingSession) {
-        const workout = getWorkoutById(trackingSession.workoutId);
-        if (workout && workout.repeatFrequencyDays && workout.repeatFrequencyDays > 0) {
-            setWorkoutToUpdateDeadline(workout);
-        }
+        // const workout = getWorkoutById(trackingSession.workoutId);
+        // if (workout && workout.repeatFrequencyDays && workout.repeatFrequencyDays > 0) {
+            // setWorkoutToUpdateDeadline(workout);
+        // }
         toast({
             title: "Treino Finalizado!",
             description: `A sessão de ${trackingSession.workoutName} foi marcada como concluída e sua performance registrada.`,
         });
     }
     setTrackingSession(null);
-  }, [trackingSession, getWorkoutById, toast]);
+  }, [trackingSession, toast]);
 
 
+  /*
   const handleDeadlineSave = (updatedWorkoutId: string, newDeadline?: Date) => {
-    const workoutToUpdate = getWorkoutById(updatedWorkoutId);
-    if (workoutToUpdate) {
-      updateWorkout({ ...workoutToUpdate, deadline: newDeadline ? newDeadline.toISOString() : undefined });
+    // const workoutToUpdate = getWorkoutById(updatedWorkoutId);
+    // if (workoutToUpdate) {
+      // updateWorkout({ ...workoutToUpdate, deadline: newDeadline ? newDeadline.toISOString() : undefined });
       toast({
         title: "Deadline Atualizado!",
-        description: `O deadline para ${workoutToUpdate.name} foi ${newDeadline ? 'definido' : 'removido'}.`,
+        // description: `O deadline para ${workoutToUpdate.name} foi ${newDeadline ? 'definido' : 'removido'}.`,
       });
-    }
-    setWorkoutToUpdateDeadline(null);
+    // }
+    // setWorkoutToUpdateDeadline(null);
   };
 
   const handleDeleteSessionConfirm = () => {
-    if (sessionToDelete) {
-      deleteSession(sessionToDelete.id);
+    // if (sessionToDelete) {
+      // deleteSession(sessionToDelete.id);
       toast({
         title: "Sessão Excluída",
-        description: `A sessão de treino "${sessionToDelete.workoutName}" foi removida do histórico.`,
+        // description: `A sessão de treino "${sessionToDelete.workoutName}" foi removida do histórico.`,
       });
-      setSessionToDelete(null);
-    }
+      // setSessionToDelete(null);
+    // }
   };
+  */
+  const workoutForTrackingModal = trackingSession ? getWorkoutById(trackingSession.workoutId) : undefined;
+
 
   return (
     <AppLayout>
@@ -135,7 +143,11 @@ export default function ProgressTrackingPage() {
               <CardDescription>Visualize a frequência e o volume dos seus treinos ao longo do tempo.</CardDescription>
             </CardHeader>
             <CardContent>
-              <PlaceholderChart />
+              {/* <PlaceholderChart /> */}
+              <div className="w-full h-64 bg-muted rounded-md flex items-center justify-center">
+                <BarChart3 className="h-16 w-16 text-muted-foreground" />
+                <p className="ml-2 text-muted-foreground">Gráfico em Breve (PlaceholderChart comentado)</p>
+              </div>
             </CardContent>
           </Card>
 
@@ -163,8 +175,7 @@ export default function ProgressTrackingPage() {
                       return (
                       <li key={session.id} className="p-3 border rounded-md bg-card hover:bg-muted/10 transition-colors">
                         <div className="flex flex-col sm:flex-row sm:justify-between items-start gap-2">
-                          {/* Botões de Ação - Order 1 em mobile, Order 2 em sm+ */}
-                          <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 mt-2 sm:mt-0 w-full sm:w-auto order-1 sm:order-2">
+                           <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2 mt-2 sm:mt-0 w-full sm:w-auto order-1 sm:order-2">
                             {!session.isCompleted && !isWorkoutDeleted ? (
                               <>
                                 {hasGlobalWarmup && session.isGlobalWarmupCompleted ? (
@@ -177,26 +188,26 @@ export default function ProgressTrackingPage() {
                                     >
                                       <PlayCircle className="mr-2 h-4 w-4 text-primary-foreground" /> Acompanhar
                                     </Button>
-                                    <Button
+                                    {/* <Button
                                       size="sm"
                                       variant="ghost"
-                                      onClick={() => handleUndoGlobalWarmup(session.id, session.workoutName)}
+                                      // onClick={() => handleUndoGlobalWarmup(session.id, session.workoutName)}
                                       className="whitespace-nowrap"
                                       title="Desfazer aquecimento global"
                                     >
                                       <Undo2 className="mr-2 h-4 w-4" /> Desfazer Aquecimento
-                                    </Button>
+                                    </Button> */}
                                   </>
                                 ) : hasGlobalWarmup && !session.isGlobalWarmupCompleted ? (
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => handleGlobalWarmupCompleted(session.id, session.workoutName)}
+                                    // onClick={() => handleGlobalWarmupCompleted(session.id, session.workoutName)}
                                     className="whitespace-nowrap"
                                   >
                                     <Flame className="mr-2 h-4 w-4 text-orange-500" /> Concluir Aquecimento
                                   </Button>
-                                ) : ( // Não tem aquecimento global
+                                ) : ( 
                                     <Button
                                       size="sm"
                                       variant="default"
@@ -207,34 +218,37 @@ export default function ProgressTrackingPage() {
                                     </Button>
                                 )}
                                
-                                <AlertDialog>
+                                {/* <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <Button
                                     variant="destructive"
                                     size="icon"
-                                    onClick={() => setSessionToDelete(session)}
+                                    // onClick={() => setSessionToDelete(session)}
                                     title="Excluir sessão não concluída"
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
                                 </AlertDialogTrigger>
-                                {sessionToDelete && sessionToDelete.id === session.id && (
+                                {/* {sessionToDelete && sessionToDelete.id === session.id && (
                                   <AlertDialogContent>
                                     <AlertDialogHeader>
                                       <AlertDialogTitle>Excluir Sessão de Treino?</AlertDialogTitle>
-                                      <AlertDialogDescription id={deleteDialogDescriptionId}>
+                                      <AlertDialogDescription // id={deleteDialogDescriptionId}
+                                      >
                                         Você tem certeza que deseja excluir esta sessão de treino iniciada para "{sessionToDelete.workoutName}"? Esta ação não pode ser desfeita.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
-                                      <AlertDialogCancel onClick={() => setSessionToDelete(null)}>Cancelar</AlertDialogCancel>
-                                      <AlertDialogAction onClick={handleDeleteSessionConfirm}>
+                                      <AlertDialogCancel // onClick={() => setSessionToDelete(null)}
+                                      >Cancelar</AlertDialogCancel>
+                                      <AlertDialogAction // onClick={handleDeleteSessionConfirm}
+                                      >
                                         Excluir Sessão
                                       </AlertDialogAction>
                                     </AlertDialogFooter>
                                   </AlertDialogContent>
                                 )}
-                              </AlertDialog>
+                              </AlertDialog> */}
                               </>
                             ) : (
                               session.isCompleted && (
@@ -245,7 +259,6 @@ export default function ProgressTrackingPage() {
                             )}
                           </div>
 
-                           {/* Informações do Treino - Order 2 em mobile, Order 1 em sm+ */}
                           <div className="flex-grow order-2 sm:order-1">
                             <p className="font-semibold">{displayName}</p>
                             <p className="text-sm text-muted-foreground">
@@ -289,26 +302,27 @@ export default function ProgressTrackingPage() {
         </Card>
 
       </div>
-      {workoutToUpdateDeadline && (
+      {/* {workoutToUpdateDeadline && (
         <DeadlineUpdateModal
           isOpen={!!workoutToUpdateDeadline}
           onClose={() => setWorkoutToUpdateDeadline(null)}
           workout={workoutToUpdateDeadline}
           onSave={handleDeadlineSave}
         />
-      )}
+      )} */}
       {isTrackModalOpen && trackingSession && workoutForTrackingModal && (
         <TrackWorkoutModal
           isOpen={isTrackModalOpen}
           onClose={() => {
             setIsTrackModalOpen(false);
-             // Mantém trackingSession para caso o modal seja reaberto, dados não são perdidos até a conclusão final.
           }}
           session={trackingSession}
           workout={workoutForTrackingModal}
-          onWorkoutFinallyCompleted={handleWorkoutFinallyCompleted}
+          onWorkoutFinallyCompleted={() => { /* handleWorkoutFinallyCompleted(); */ setTrackingSession(null);}}
         />
       )}
     </AppLayout>
   );
 }
+    
+    
