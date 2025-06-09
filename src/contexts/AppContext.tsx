@@ -17,7 +17,7 @@ interface AppContextType {
 
   sessions: WorkoutSession[];
   addSession: (sessionData: Pick<WorkoutSession, 'workoutId' | 'workoutName' | 'date'>) => void;
-  updateSessionExercisePerformance: (sessionId: string, exerciseId: string, updates: Partial<SessionExercisePerformance>) => void;
+  updateSessionExercisePerformance: (sessionId: string, exerciseId: string, updates: Partial<SessionExercisePerformance> & { logNewRestTime?: number }) => void;
   markGlobalWarmupAsCompleted: (sessionId: string) => void;
   undoGlobalWarmup: (sessionId: string) => void;
   completeSession: (sessionId: string) => void;
@@ -135,7 +135,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       hasWarmup: ex.hasWarmup || false,
       isWarmupCompleted: false,
       isExerciseCompleted: false,
-      restTimeSeconds: undefined, // Initialize restTimeSeconds
+      restTimes: [], // Initialize restTimes as an empty array
     }));
 
     const newSession: WorkoutSession = {
@@ -149,7 +149,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSessions((prev) => [newSession, ...prev]);
   };
   
-  const updateSessionExercisePerformance = useCallback((sessionId: string, exerciseId: string, updates: Partial<SessionExercisePerformance>) => {
+  const updateSessionExercisePerformance = useCallback((sessionId: string, exerciseId: string, updates: Partial<SessionExercisePerformance> & { logNewRestTime?: number }) => {
     setSessions(prevSessions =>
       prevSessions.map(session => {
         if (session.id === sessionId) {
@@ -157,7 +157,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
             ...session,
             exercisePerformances: session.exercisePerformances.map(perf => {
               if (perf.exerciseId === exerciseId) {
-                return { ...perf, ...updates };
+                let newPerfData = { ...perf };
+                const { logNewRestTime, ...otherUpdates } = updates;
+
+                // Handle logging a new rest time
+                if (typeof logNewRestTime === 'number') {
+                  const currentRestTimes = newPerfData.restTimes || [];
+                  const updatedLog = [...currentRestTimes, logNewRestTime];
+                  if (updatedLog.length > 3) {
+                    updatedLog.shift(); // Remove the oldest if more than 3
+                  }
+                  newPerfData.restTimes = updatedLog;
+                }
+                
+                // Apply other updates (like isWarmupCompleted, weightUsed, or direct restTimes array from clear)
+                newPerfData = { ...newPerfData, ...otherUpdates };
+                
+                return newPerfData;
               }
               return perf;
             }),
@@ -239,24 +255,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const pastDate = new Date(today);
     pastDate.setDate(today.getDate() - lastNDays);
 
-    const relevantRestTimes: number[] = [];
+    const allRestTimesForExercise: number[] = [];
 
     sessions.forEach(session => {
       if (session.isCompleted) {
         const sessionDate = parseISO(session.date);
         if (isWithinInterval(sessionDate, { start: pastDate, end: today })) {
           session.exercisePerformances.forEach(perf => {
-            if (perf.exerciseId === exerciseId && typeof perf.restTimeSeconds === 'number') {
-              relevantRestTimes.push(perf.restTimeSeconds);
+            if (perf.exerciseId === exerciseId && perf.restTimes && perf.restTimes.length > 0) {
+              perf.restTimes.forEach(time => {
+                if (typeof time === 'number') {
+                  allRestTimesForExercise.push(time);
+                }
+              });
             }
           });
         }
       }
     });
 
-    if (relevantRestTimes.length === 0) return null;
-    const sum = relevantRestTimes.reduce((acc, time) => acc + time, 0);
-    return Math.round(sum / relevantRestTimes.length);
+    if (allRestTimesForExercise.length === 0) return null;
+    const sum = allRestTimesForExercise.reduce((acc, time) => acc + time, 0);
+    return Math.round(sum / allRestTimesForExercise.length);
   }, [sessions]);
 
 
