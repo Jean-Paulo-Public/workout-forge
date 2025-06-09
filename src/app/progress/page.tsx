@@ -4,7 +4,7 @@
 import { AppLayout } from '@/components/layout/app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { BarChart3, History, TrendingUp, CheckCircle2, PlayCircle, Flame, Trash2 } from 'lucide-react';
+import { BarChart3, History, TrendingUp, CheckCircle2, PlayCircle, Flame, Trash2, Undo2 } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -34,7 +34,7 @@ const PlaceholderChart = () => (
 );
 
 export default function ProgressTrackingPage() {
-  const { sessions, getWorkoutById, updateWorkout, markGlobalWarmupAsCompleted, deleteSession } = useAppContext();
+  const { sessions, getWorkoutById, updateWorkout, markGlobalWarmupAsCompleted, undoGlobalWarmup, deleteSession } = useAppContext();
   const { toast } = useToast();
   const [workoutToUpdateDeadline, setWorkoutToUpdateDeadline] = useState<Workout | null>(null);
   const [sessionToDelete, setSessionToDelete] = useState<WorkoutSession | null>(null);
@@ -49,14 +49,13 @@ export default function ProgressTrackingPage() {
     return [...sessions].sort((a, b) => {
       // Prioridade 1: Sessões não concluídas primeiro
       if (!a.isCompleted && b.isCompleted) {
-        return -1; // a vem antes de b
+        return -1;
       }
       if (a.isCompleted && !b.isCompleted) {
-        return 1; // b vem antes de a
+        return 1;
       }
-
-      // Prioridade 2: Data (mais recente primeiro)
-      // Isso se aplica se ambas as sessões têm o mesmo status de 'isCompleted'
+      // Se ambas têm o mesmo status de 'isCompleted' (ambas não concluídas ou ambas concluídas)
+      // Ordenar por data mais recente primeiro
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
   }, [sessions]);
@@ -71,6 +70,15 @@ export default function ProgressTrackingPage() {
     toast({
       title: "Aquecimento Geral Concluído!",
       description: `Aquecimento para ${workoutName} finalizado. Prossiga para os exercícios!`,
+    });
+  };
+
+  const handleUndoGlobalWarmup = (sessionId: string, workoutName: string) => {
+    undoGlobalWarmup(sessionId);
+    toast({
+      title: "Aquecimento Geral Desfeito!",
+      description: `O estado do aquecimento para ${workoutName} foi revertido.`,
+      variant: "default",
     });
   };
 
@@ -150,7 +158,7 @@ export default function ProgressTrackingPage() {
                       const isWorkoutDeleted = !workoutDetails;
                       const displayName = isWorkoutDeleted ? `${session.workoutName} (Treino Excluído)` : session.workoutName;
                       
-                      const needsGlobalWarmup = !isWorkoutDeleted && workoutDetails?.hasGlobalWarmup && !session.isGlobalWarmupCompleted;
+                      const hasGlobalWarmup = workoutDetails?.hasGlobalWarmup;
 
                       return (
                       <li key={session.id} className="p-3 border rounded-md bg-card hover:bg-muted/10 transition-colors">
@@ -164,8 +172,9 @@ export default function ProgressTrackingPage() {
                           </div>
                           <div className="flex items-center gap-2 mt-2 sm:mt-0 flex-shrink-0">
                             {!session.isCompleted && !isWorkoutDeleted ? (
-                              needsGlobalWarmup ? (
-                                 <Button
+                              <>
+                                {hasGlobalWarmup && !session.isGlobalWarmupCompleted && (
+                                  <Button
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleGlobalWarmupCompleted(session.id, session.workoutName)}
@@ -173,16 +182,29 @@ export default function ProgressTrackingPage() {
                                   >
                                     <Flame className="mr-2 h-4 w-4 text-orange-500" /> Concluir Aquecimento
                                   </Button>
-                              ) : (
-                                  <Button
-                                  size="sm"
-                                  variant="default"
-                                  onClick={() => openTrackWorkoutModal(session)}
-                                  className="whitespace-nowrap"
+                                )}
+                                {hasGlobalWarmup && session.isGlobalWarmupCompleted && (
+                                   <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleUndoGlobalWarmup(session.id, session.workoutName)}
+                                    className="whitespace-nowrap"
+                                    title="Desfazer aquecimento global"
                                   >
-                                  <PlayCircle className="mr-2 h-4 w-4 text-primary-foreground" /> Acompanhar
+                                    <Undo2 className="mr-2 h-4 w-4" /> Desfazer Aquecimento
                                   </Button>
-                              )
+                                )}
+                                {(!hasGlobalWarmup || session.isGlobalWarmupCompleted) && (
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    onClick={() => openTrackWorkoutModal(session)}
+                                    className="whitespace-nowrap"
+                                  >
+                                    <PlayCircle className="mr-2 h-4 w-4 text-primary-foreground" /> Acompanhar
+                                  </Button>
+                                )}
+                              </>
                             ) : (
                               session.isCompleted && (
                                 <span className="text-xs text-green-600 font-medium flex items-center whitespace-nowrap">
@@ -279,4 +301,3 @@ export default function ProgressTrackingPage() {
     </AppLayout>
   );
 }
-
