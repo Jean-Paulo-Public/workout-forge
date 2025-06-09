@@ -46,11 +46,11 @@ interface TrackWorkoutModalProps {
 }
 
 export function TrackWorkoutModal({ isOpen, onClose, session: sessionProp, workout, onWorkoutFinallyCompleted }: TrackWorkoutModalProps) {
-  const { 
-    updateSessionExercisePerformance, 
-    completeSession, 
-    getLastUsedWeightForExercise, 
-    userSettings, 
+  const {
+    updateSessionExercisePerformance,
+    completeSession,
+    getLastUsedWeightForExercise,
+    userSettings,
     getAverageRestTimeForExercise,
     getSessionById // Adicionado
   } = useAppContext();
@@ -168,7 +168,7 @@ export function TrackWorkoutModal({ isOpen, onClose, session: sessionProp, worko
     const sessionDataFromContext = getSessionById(sessionProp.id);
     const perfFromContext = sessionDataFromContext?.exercisePerformances.find(p => p.exerciseId === performanceData.exerciseId);
 
-    setCurrentExerciseForRest(perfFromContext || performanceData); 
+    setCurrentExerciseForRest(perfFromContext || performanceData);
     setCurrentExerciseIndexForRest(index);
     setIsRestTimerModalOpen(true);
   };
@@ -216,7 +216,7 @@ export function TrackWorkoutModal({ isOpen, onClose, session: sessionProp, worko
                     if (!currentItemState) return null;
 
                     const canUndo = currentItemState.isExerciseCompleted || (currentItemState.hasWarmup && currentItemState.isWarmupCompleted);
-                    
+
                     const isWarmupDoneOrNotApplicable = !currentItemState.hasWarmup || currentItemState.isWarmupCompleted;
                     const canRegisterRest = isWarmupDoneOrNotApplicable && !currentItemState.isExerciseCompleted;
 
@@ -239,10 +239,10 @@ export function TrackWorkoutModal({ isOpen, onClose, session: sessionProp, worko
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 mb-3">
                           <p className="text-sm text-muted-foreground">
-                              Planejado: <span className="font-medium text-foreground">{currentItemState.plannedWeight || "N/A"}</span>
+                              Peso planejado: <span className="font-medium text-foreground">{currentItemState.plannedWeight || "N/A"}</span>
                           </p>
                           <p className="text-sm text-muted-foreground">
-                              Último Usado: <span className="font-medium text-foreground">{currentItemState.lastUsedWeight || "N/A"}</span>
+                              Último peso usado: <span className="font-medium text-foreground">{currentItemState.lastUsedWeight || "N/A"}</span>
                           </p>
 
                           <div className="text-sm text-muted-foreground col-span-1 sm:col-span-2 space-y-0.5">
@@ -319,10 +319,10 @@ export function TrackWorkoutModal({ isOpen, onClose, session: sessionProp, worko
                                   <CheckCircle2 className="mr-2 h-4 w-4" /> Concluir Exercício
                               </Button>
                           )}
-                           <Button 
-                            type="button" 
-                            variant="secondary" 
-                            size="sm" 
+                           <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
                             onClick={() => openRestTimer(currentItemState, index)}
                             disabled={!canRegisterRest}
                             title={!canRegisterRest ? (currentItemState.isExerciseCompleted ? "Exercício já concluído" : "Conclua o aquecimento primeiro") : "Registrar tempo de descanso"}
