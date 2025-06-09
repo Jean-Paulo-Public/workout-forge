@@ -22,6 +22,7 @@ interface AppContextType {
   undoGlobalWarmup: (sessionId: string) => void;
   completeSession: (sessionId: string) => void;
   deleteSession: (sessionId: string) => void;
+  getSessionById: (sessionId: string) => WorkoutSession | undefined;
   hasActiveSession: (workoutId: string) => boolean;
   getLastUsedWeightForExercise: (workoutId: string, exerciseId: string) => string | undefined;
   getAverageRestTimeForExercise: (exerciseId: string, lastNDays?: number) => number | null;
@@ -215,6 +216,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSessions(prev => prev.filter(s => s.id !== sessionId));
   };
   
+  const getSessionById = (sessionId: string): WorkoutSession | undefined => {
+    return sessions.find(s => s.id === sessionId);
+  };
+
   const getLastUsedWeightForExercise = useCallback((workoutId: string, exerciseId: string): string | undefined => {
     const relevantSessions = sessions
       .filter(s => s.workoutId === workoutId && s.isCompleted)
@@ -279,6 +284,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     undoGlobalWarmup,
     completeSession,
     deleteSession,
+    getSessionById,
     hasActiveSession,
     getLastUsedWeightForExercise,
     getAverageRestTimeForExercise,
