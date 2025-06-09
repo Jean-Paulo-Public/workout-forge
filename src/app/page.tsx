@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Weight } from 'lucide-react'; // Changed from Dumbbell
+import { Dumbbell } from 'lucide-react'; // Changed back from Weight
 import { useState, useEffect } from 'react';
 
 export default function WelcomePage() {
@@ -19,7 +19,7 @@ export default function WelcomePage() {
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <Weight className="h-16 w-16 text-primary" /> {/* Changed from Dumbbell */}
+            <Dumbbell className="h-16 w-16 text-primary" /> {/* Changed back from Weight */}
           </div>
           <CardTitle className="text-3xl font-headline">Bem-vindo ao Workout Forge!</CardTitle>
           <CardDescription className="text-md text-muted-foreground pt-2">
