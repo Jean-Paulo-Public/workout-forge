@@ -26,6 +26,7 @@ import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Badge } from "@/components/ui/badge";
 import { WorkoutTemplateSelectionModal } from '@/components/WorkoutTemplateSelectionModal';
+import { ConfirmScheduleModal } from '@/components/ConfirmScheduleModal'; // Novo Import
 import { generateWorkoutFromTemplate } from '@/lib/workout-templates';
 
 export default function WorkoutLibraryPage() {
@@ -34,6 +35,11 @@ export default function WorkoutLibraryPage() {
   const router = useRouter();
   const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  
+  const [isConfirmScheduleModalOpen, setIsConfirmScheduleModalOpen] = useState(false);
+  const [generatedWorkoutForConfirmation, setGeneratedWorkoutForConfirmation] = useState<Omit<Workout, 'id'> | null>(null);
+  const [scheduleSuggestions, setScheduleSuggestions] = useState<{deadline?: string, frequency?: number}>({});
+
 
   const handleDeleteWorkout = (workoutId: string) => {
     deleteWorkout(workoutId);
@@ -96,14 +102,15 @@ export default function WorkoutLibraryPage() {
     return display;
   };
 
-  const handleCreateWorkoutFromTemplate = (templateKey: string) => {
-    const generatedWorkoutData = generateWorkoutFromTemplate(templateKey, userSettings, workouts);
-    if (generatedWorkoutData) {
-      addContextWorkout(generatedWorkoutData); // AppContext.addWorkout espera Omit<Workout, 'id'>
-      toast({
-        title: "Treino Modelo Adicionado!",
-        description: `O treino "${generatedWorkoutData.name}" foi adicionado à sua biblioteca.`
+  const handleSelectWorkoutTemplate = (templateKey: string) => {
+    const generationResult = generateWorkoutFromTemplate(templateKey, userSettings, workouts);
+    if (generationResult) {
+      setGeneratedWorkoutForConfirmation(generationResult.workoutData);
+      setScheduleSuggestions({
+        deadline: generationResult.suggestedDeadlineISO,
+        frequency: generationResult.suggestedFrequencyDays
       });
+      setIsConfirmScheduleModalOpen(true);
     } else {
       toast({
         title: "Erro ao Gerar Treino",
@@ -111,8 +118,30 @@ export default function WorkoutLibraryPage() {
         variant: "destructive"
       });
     }
-    setIsTemplateModalOpen(false);
+    setIsTemplateModalOpen(false); // Fechar modal de seleção de template
   };
+
+  const handleConfirmSchedule = (useSuggestions: boolean) => {
+    if (generatedWorkoutForConfirmation) {
+      let workoutToAdd = { ...generatedWorkoutForConfirmation };
+      if (useSuggestions) {
+        workoutToAdd.deadline = scheduleSuggestions.deadline;
+        workoutToAdd.repeatFrequencyDays = scheduleSuggestions.frequency;
+      } else {
+        workoutToAdd.deadline = undefined;
+        workoutToAdd.repeatFrequencyDays = undefined;
+      }
+      addContextWorkout(workoutToAdd);
+      toast({
+        title: "Treino Adicionado!",
+        description: `O treino "${workoutToAdd.name}" foi adicionado à sua biblioteca.`
+      });
+    }
+    setIsConfirmScheduleModalOpen(false);
+    setGeneratedWorkoutForConfirmation(null);
+    setScheduleSuggestions({});
+  };
+
 
   return (
     <AppLayout>
@@ -302,8 +331,23 @@ export default function WorkoutLibraryPage() {
       <WorkoutTemplateSelectionModal
         isOpen={isTemplateModalOpen}
         onClose={() => setIsTemplateModalOpen(false)}
-        onSelectTemplate={handleCreateWorkoutFromTemplate}
+        onSelectTemplate={handleSelectWorkoutTemplate}
       />
+
+      {generatedWorkoutForConfirmation && (
+        <ConfirmScheduleModal
+          isOpen={isConfirmScheduleModalOpen}
+          onClose={() => {
+            setIsConfirmScheduleModalOpen(false);
+            setGeneratedWorkoutForConfirmation(null);
+            setScheduleSuggestions({});
+          }}
+          workoutName={generatedWorkoutForConfirmation.name}
+          suggestedDeadlineISO={scheduleSuggestions.deadline}
+          suggestedFrequencyDays={scheduleSuggestions.frequency}
+          onConfirm={handleConfirmSchedule}
+        />
+      )}
     </AppLayout>
   );
 }

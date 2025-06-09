@@ -3,6 +3,7 @@
 
 import type { ModelExercise, Exercise, Workout, UserSettings } from './types';
 import { modelExerciseData } from './model-exercises';
+import { muscleGroupSuggestedFrequencies } from './muscle-group-frequencies';
 import { startOfToday, addDays } from 'date-fns';
 
 // Helper function to shuffle an array
@@ -136,7 +137,7 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
       { group: 'Abdômen', count: 2 },
       { group: 'Lombar', count: 1 },
     ],
-    hasGlobalWarmup: true,
+    hasGlobalWarmup: true, // Usually no global warmup before core, but can be on a separate day
   },
   "CoreEAcessorios_Mini": {
     name: "Treino Modelo - Core e Acessórios [ Mini ]",
@@ -149,11 +150,17 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
   }
 };
 
+interface GeneratedWorkoutOutput {
+  workoutData: Omit<Workout, 'id'>;
+  suggestedFrequencyDays?: number;
+  suggestedDeadlineISO?: string;
+}
+
 export function generateWorkoutFromTemplate(
   templateKey: string,
   userSettings: UserSettings,
-  existingWorkouts: Workout[] = [] // Novo parâmetro com valor padrão
-): Omit<Workout, 'id'> | null {
+  existingWorkouts: Workout[] = []
+): GeneratedWorkoutOutput | null {
   const template = workoutTemplates[templateKey];
   if (!template) {
     console.error(`Template não encontrado: ${templateKey}`);
@@ -219,7 +226,7 @@ export function generateWorkoutFromTemplate(
       }
 
       generatedExercises.push({
-        id: generateId(), // ID temporário, AppContext pode gerar o final se necessário
+        id: generateId(),
         name: modelEx.name,
         sets: userSettings.defaultSets,
         reps: userSettings.defaultReps,
@@ -235,8 +242,9 @@ export function generateWorkoutFromTemplate(
       console.warn(`Nenhum exercício gerado para o modelo: ${templateKey}`);
   }
 
-  let finalRepeatFrequencyDays: number | undefined = undefined;
-  let finalDeadline: string | undefined = undefined;
+  let suggestedFrequencyDays: number | undefined = undefined;
+  let suggestedDeadlineISO: string | undefined = undefined;
+  const today = startOfToday();
 
   if (templateKey.includes("_Mini")) {
     const majorMuscleGroups = [
@@ -248,21 +256,43 @@ export function generateWorkoutFromTemplate(
 
     for (const exercise of generatedExercises) {
         if (exercise.muscleGroups?.some(group => majorMuscleGroups.includes(group))) {
-            calculatedRepeatFrequency = 2;
+            calculatedRepeatFrequency = 2; // Músculos grandes -> 2 dias
             break;
         }
     }
-    finalRepeatFrequencyDays = calculatedRepeatFrequency;
-    const today = startOfToday();
-    finalDeadline = addDays(today, finalRepeatFrequencyDays).toISOString();
+    suggestedFrequencyDays = calculatedRepeatFrequency;
+    if (suggestedFrequencyDays > 0) {
+        suggestedDeadlineISO = addDays(today, suggestedFrequencyDays).toISOString();
+    }
+  } else {
+    // Para modelos normais, calcular a frequência máxima sugerida
+    let maxSuggestedFrequency = 0;
+    generatedExercises.forEach(exercise => {
+      if (exercise.muscleGroups && exercise.muscleGroups.length > 0) {
+        exercise.muscleGroups.forEach(group => {
+          if (muscleGroupSuggestedFrequencies[group] && muscleGroupSuggestedFrequencies[group] > maxSuggestedFrequency) {
+            maxSuggestedFrequency = muscleGroupSuggestedFrequencies[group];
+          }
+        });
+      }
+    });
+    if (maxSuggestedFrequency > 0) {
+      suggestedFrequencyDays = maxSuggestedFrequency;
+      suggestedDeadlineISO = addDays(today, suggestedFrequencyDays).toISOString();
+    }
   }
 
-  return {
+  const workoutData: Omit<Workout, 'id'> = {
     name: template.name,
     description: template.description,
     exercises: generatedExercises,
     hasGlobalWarmup: template.hasGlobalWarmup !== undefined ? template.hasGlobalWarmup : true,
-    repeatFrequencyDays: finalRepeatFrequencyDays,
-    deadline: finalDeadline,
+    // repeatFrequencyDays and deadline will be set based on user choice in the modal
+  };
+
+  return {
+    workoutData,
+    suggestedFrequencyDays,
+    suggestedDeadlineISO,
   };
 }
