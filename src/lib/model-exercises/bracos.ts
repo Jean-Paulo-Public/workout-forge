@@ -55,5 +55,11 @@ export const bracosExercises: ModelExercise[] = [
     muscleGroups: ["Antebraço"],
     description: "Sentado, apoie os antebraços nas coxas ou em um banco, com os punhos para fora. Segure uma barra com pegada pronada (para flexores) ou supinada (para extensores). Flexione ou estenda os punhos, movendo apenas as mãos. Controle o movimento.",
     defaultWeight: "Ajustável"
+  },
+  {
+    name: "Rosca Zottman",
+    muscleGroups: ["Antebraço", "Bíceps"],
+    description: "Em pé, segure halteres com pegada supinada (palmas para cima). Realize uma rosca direta. No topo, rotacione os punhos para uma pegada pronada (palmas para baixo) e desça o peso controladamente. Na base, rotacione de volta para a pegada supinada para a próxima repetição.",
+    defaultWeight: "Ajustável"
   }
 ];
