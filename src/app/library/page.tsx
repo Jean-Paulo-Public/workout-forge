@@ -1,13 +1,13 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAppContext } from '@/contexts/AppContext';
 import type { Workout, Exercise } from '@/lib/types';
-import { PlusCircle, Trash2, Play, Eye, Target, Flame, Edit, Repeat, AlertTriangle, CalendarDays, LayoutGrid } from 'lucide-react';
+import { PlusCircle, Trash2, Play, Eye, Target, Flame, Edit, Repeat, AlertTriangle, CalendarDays, LayoutGrid, ListOrdered, Save, X, ArrowUp, ArrowDown } from 'lucide-react';
 import Link from 'next/link';
 import {
   AlertDialog,
@@ -26,11 +26,11 @@ import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Badge } from "@/components/ui/badge";
 import { WorkoutTemplateSelectionModal } from '@/components/WorkoutTemplateSelectionModal';
-import { ConfirmScheduleModal } from '@/components/ConfirmScheduleModal'; // Novo Import
+import { ConfirmScheduleModal } from '@/components/ConfirmScheduleModal';
 import { generateWorkoutFromTemplate } from '@/lib/workout-templates';
 
 export default function WorkoutLibraryPage() {
-  const { workouts, deleteWorkout, addSession, getWorkoutById, hasActiveSession, userSettings, addWorkout: addContextWorkout } = useAppContext();
+  const { workouts, deleteWorkout, addSession, getWorkoutById, hasActiveSession, userSettings, addWorkout: addContextWorkout, updateWorkoutsOrder } = useAppContext();
   const { toast } = useToast();
   const router = useRouter();
   const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null);
@@ -39,6 +39,15 @@ export default function WorkoutLibraryPage() {
   const [isConfirmScheduleModalOpen, setIsConfirmScheduleModalOpen] = useState(false);
   const [generatedWorkoutForConfirmation, setGeneratedWorkoutForConfirmation] = useState<Omit<Workout, 'id'> | null>(null);
   const [scheduleSuggestions, setScheduleSuggestions] = useState<{deadline?: string, frequency?: number}>({});
+
+  const [isReorderingActive, setIsReorderingActive] = useState(false);
+  const [orderedWorkouts, setOrderedWorkouts] = useState<Workout[]>([]);
+
+  useEffect(() => {
+    if (!isReorderingActive) {
+      setOrderedWorkouts([...workouts]);
+    }
+  }, [workouts, isReorderingActive]);
 
 
   const handleDeleteWorkout = (workoutId: string) => {
@@ -118,7 +127,7 @@ export default function WorkoutLibraryPage() {
         variant: "destructive"
       });
     }
-    setIsTemplateModalOpen(false); // Fechar modal de seleção de template
+    setIsTemplateModalOpen(false); 
   };
 
   const handleConfirmSchedule = (useSuggestions: boolean) => {
@@ -142,6 +151,33 @@ export default function WorkoutLibraryPage() {
     setScheduleSuggestions({});
   };
 
+  const handleToggleReorderMode = () => {
+    if (isReorderingActive) {
+      setIsReorderingActive(false);
+    } else {
+      setOrderedWorkouts([...workouts]); 
+      setIsReorderingActive(true);
+    }
+  };
+
+  const handleSaveOrder = () => {
+    updateWorkoutsOrder(orderedWorkouts);
+    setIsReorderingActive(false);
+    toast({ title: "Ordem Salva", description: "A nova ordem dos treinos foi salva." });
+  };
+
+  const moveWorkoutInList = (index: number, direction: 'up' | 'down') => {
+    const newOrderedList = [...orderedWorkouts];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+
+    if (targetIndex < 0 || targetIndex >= newOrderedList.length) {
+      return; 
+    }
+    [newOrderedList[index], newOrderedList[targetIndex]] = [newOrderedList[targetIndex], newOrderedList[index]];
+    setOrderedWorkouts(newOrderedList);
+  };
+
+  const workoutsToDisplay = isReorderingActive ? orderedWorkouts : workouts;
 
   return (
     <AppLayout>
@@ -153,18 +189,33 @@ export default function WorkoutLibraryPage() {
               className="w-full sm:w-auto" 
               variant="outline" 
               onClick={() => setIsTemplateModalOpen(true)}
+              disabled={isReorderingActive}
             >
               <LayoutGrid className="mr-2 h-4 w-4" /> Adicionar via Modelo
             </Button>
-            <Link href="/builder" className="w-full sm:w-auto">
-              <Button className="w-full sm:w-auto">
+            <Link href="/builder" className={`w-full sm:w-auto ${isReorderingActive ? "pointer-events-none" : ""}`}>
+              <Button className="w-full sm:w-auto" disabled={isReorderingActive}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Novo Treino
               </Button>
             </Link>
+             <Button
+              variant="outline"
+              onClick={handleToggleReorderMode}
+              className="w-full sm:w-auto"
+            >
+              {isReorderingActive ? <X className="mr-2 h-4 w-4" /> : <ListOrdered className="mr-2 h-4 w-4" />}
+              {isReorderingActive ? "Cancelar Reordenação" : "Reordenar Treinos"}
+            </Button>
+            {isReorderingActive && (
+              <Button onClick={handleSaveOrder} className="w-full sm:w-auto">
+                <Save className="mr-2 h-4 w-4" />
+                Salvar Ordem
+              </Button>
+            )}
           </div>
         </div>
 
-        {workouts.length === 0 ? (
+        {workoutsToDisplay.length === 0 && !isReorderingActive ? (
           <Card className="text-center">
             <CardHeader>
               <CardTitle className="font-headline">Sua Biblioteca está Vazia</CardTitle>
@@ -188,14 +239,14 @@ export default function WorkoutLibraryPage() {
           </Card>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {workouts.map((workout) => {
+            {workoutsToDisplay.map((workout, index) => {
               const isActive = hasActiveSession(workout.id);
               return (
               <Card key={workout.id} className="flex flex-col">
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <CardTitle className="font-headline">{workout.name}</CardTitle>
-                    {isActive && <Badge variant="destructive" className="text-xs ml-2">ATIVO</Badge>}
+                    {!isReorderingActive && isActive && <Badge variant="destructive" className="text-xs ml-2">ATIVO</Badge>}
                   </div>
                   {workout.description && (
                     <CardDescription>{workout.description}</CardDescription>
@@ -226,42 +277,67 @@ export default function WorkoutLibraryPage() {
                   </ul>
                 </CardContent>
                 <CardFooter className="flex flex-wrap gap-2 justify-end">
-                  <Button variant="outline" size="sm" onClick={() => setSelectedWorkout(workout)}>
-                    <Eye className="mr-1 h-4 w-4" /> Visualizar
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={() => handleEditWorkout(workout.id)}>
-                    <Edit className="mr-1 h-4 w-4" /> Editar
-                  </Button>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => handleStartWorkout(workout)}
-                    disabled={isActive}
-                    title={isActive ? "Este treino já está em andamento" : "Iniciar treino"}
-                  >
-                    <Play className="mr-1 h-4 w-4" /> {isActive ? "Em Andamento" : "Iniciar"}
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="destructive" size="icon" title="Excluir Treino">
-                        <Trash2 className="h-4 w-4" />
+                  {isReorderingActive ? (
+                     <div className="flex w-full justify-end items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => moveWorkoutInList(index, 'up')}
+                            disabled={index === 0}
+                            title="Mover treino para cima"
+                        >
+                            <ArrowUp className="h-4 w-4" />
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => moveWorkoutInList(index, 'down')}
+                            disabled={index === workoutsToDisplay.length - 1}
+                            title="Mover treino para baixo"
+                        >
+                            <ArrowDown className="h-4 w-4" />
+                        </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <Button variant="outline" size="sm" onClick={() => setSelectedWorkout(workout)}>
+                        <Eye className="mr-1 h-4 w-4" /> Visualizar
                       </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Esta ação não pode ser desfeita. Isso excluirá permanentemente o treino "{workout.name}".
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => handleDeleteWorkout(workout.id)}>
-                          Excluir
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                      <Button variant="secondary" size="sm" onClick={() => handleEditWorkout(workout.id)}>
+                        <Edit className="mr-1 h-4 w-4" /> Editar
+                      </Button>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => handleStartWorkout(workout)}
+                        disabled={isActive}
+                        title={isActive ? "Este treino já está em andamento" : "Iniciar treino"}
+                      >
+                        <Play className="mr-1 h-4 w-4" /> {isActive ? "Em Andamento" : "Iniciar"}
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="destructive" size="icon" title="Excluir Treino">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta ação não pode ser desfeita. Isso excluirá permanentemente o treino "{workout.name}".
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDeleteWorkout(workout.id)}>
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </>
+                  )}
                 </CardFooter>
               </Card>
             )})}
@@ -351,3 +427,5 @@ export default function WorkoutLibraryPage() {
     </AppLayout>
   );
 }
+
+    

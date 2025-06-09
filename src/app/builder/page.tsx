@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Trash2, Save, Target, BookOpenCheck, CalendarIcon, Flame } from 'lucide-react';
+import { PlusCircle, Trash2, Save, Target, BookOpenCheck, CalendarIcon, Flame, ArrowUp, ArrowDown } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import type { Exercise, ModelExercise, Workout } from '@/lib/types';
@@ -136,7 +136,7 @@ export default function WorkoutBuilderPage() {
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, move } = useFieldArray({
     control: form.control,
     name: 'exercises',
   });
@@ -157,14 +157,12 @@ export default function WorkoutBuilderPage() {
         });
       }
     });
-
-    if (maxSuggestedFrequency > 0) {
-      const currentFrequencyField = form.getValues('repeatFrequencyDays');
-      const currentFrequency = currentFrequencyField === '' || currentFrequencyField === undefined ? 0 : Number(currentFrequencyField);
-
-      if (currentFrequency === 0 && maxSuggestedFrequency > 0) {
-         form.setValue('repeatFrequencyDays', maxSuggestedFrequency, { shouldDirty: true });
-      }
+    
+    const currentFrequencyField = form.getValues('repeatFrequencyDays');
+    if (currentFrequencyField === '' || currentFrequencyField === undefined || Number(currentFrequencyField) === 0) {
+        if (maxSuggestedFrequency > 0) {
+            form.setValue('repeatFrequencyDays', maxSuggestedFrequency, { shouldDirty: true });
+        }
     }
   }, [form]);
 
@@ -513,7 +511,43 @@ export default function WorkoutBuilderPage() {
               <CardContent className="space-y-6">
                 {fields.map((item, index) => (
                   <div key={item.id} className="p-4 border rounded-md space-y-4 relative">
-                    <h3 className="font-medium">Exercício {index + 1}</h3>
+                    <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-medium text-lg pt-1">Exercício {index + 1}</h3>
+                        <div className="flex gap-1">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                onClick={() => move(index, index - 1)}
+                                disabled={index === 0}
+                                title="Mover exercício para cima"
+                            >
+                                <ArrowUp className="h-4 w-4" />
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                onClick={() => move(index, index + 1)}
+                                disabled={index === fields.length - 1}
+                                title="Mover exercício para baixo"
+                            >
+                                <ArrowDown className="h-4 w-4" />
+                            </Button>
+                            {fields.length > 0 && (
+                                <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="icon"
+                                    onClick={() => remove(index)}
+                                    title="Remover exercício"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+
                     <FormField
                       control={form.control}
                       name={`exercises.${index}.name`}
@@ -611,19 +645,6 @@ export default function WorkoutBuilderPage() {
                         </FormItem>
                       )}
                     />
-
-                    {fields.length > 0 && (
-                       <Button
-                        type="button"
-                        variant="destructive"
-                        size="icon"
-                        onClick={() => remove(index)}
-                        className="absolute top-2 right-2"
-                        aria-label="Remover exercício"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
                   </div>
                 ))}
                 <div className="flex flex-col sm:flex-row gap-2">
@@ -690,3 +711,4 @@ export default function WorkoutBuilderPage() {
   );
 }
 
+    
