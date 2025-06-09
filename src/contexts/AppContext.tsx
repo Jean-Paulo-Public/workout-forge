@@ -16,7 +16,7 @@ interface AppContextType {
   addSession: (sessionData: Pick<WorkoutSession, 'workoutId' | 'workoutName' | 'date'>) => void;
   updateSessionExercisePerformance: (sessionId: string, exerciseId: string, updates: Partial<SessionExercisePerformance>) => void;
   markGlobalWarmupAsCompleted: (sessionId: string) => void;
-  undoGlobalWarmup: (sessionId: string) => void; // Nova função
+  undoGlobalWarmup: (sessionId: string) => void;
   completeSession: (sessionId: string) => void;
   deleteSession: (sessionId: string) => void;
   hasActiveSession: (workoutId: string) => boolean;
@@ -72,16 +72,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addWorkout = (workoutData: Omit<Workout, 'id'>) => {
     const newWorkout: Workout = {
-      ...workoutData,
+      ...workoutData, // Contém name, desc, exercises, repeatFreq, deadline, hasGlobalWarmup
       id: generateId(),
-      exercises: workoutData.exercises.map(ex => ({
-        ...ex,
-        id: ex.id || generateId(),
-        hasWarmup: ex.hasWarmup || false,
+      exercises: workoutData.exercises.map(ex => ({ // Garante IDs para cada exercício
+        ...ex, // Contém name, sets, reps, weight, muscleGroups, notes, hasWarmup
+        id: ex.id || generateId(), 
       })),
-      repeatFrequencyDays: workoutData.repeatFrequencyDays || undefined,
-      deadline: workoutData.deadline || undefined,
-      hasGlobalWarmup: workoutData.hasGlobalWarmup !== undefined ? workoutData.hasGlobalWarmup : true,
     };
     setWorkouts((prev) => [...prev, newWorkout]);
   };
@@ -90,6 +86,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setWorkouts((prev) =>
       prev.map((w) => (w.id === updatedWorkout.id ? {
         ...updatedWorkout,
+        // Garantir que os campos opcionais sejam undefined se não presentes
         repeatFrequencyDays: updatedWorkout.repeatFrequencyDays || undefined,
         deadline: updatedWorkout.deadline || undefined,
         hasGlobalWarmup: updatedWorkout.hasGlobalWarmup !== undefined ? updatedWorkout.hasGlobalWarmup : true,
@@ -137,7 +134,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       isCompleted: false,
       notes: `Sessão de ${sessionData.workoutName} iniciada.`,
       exercisePerformances: initialExercisePerformances,
-      isGlobalWarmupCompleted: workout.hasGlobalWarmup ? false : true,
+      isGlobalWarmupCompleted: workout.hasGlobalWarmup ? false : undefined, // undefined se não aplicável
     };
     setSessions((prev) => [newSession, ...prev]);
   };
@@ -238,7 +235,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addSession,
     updateSessionExercisePerformance,
     markGlobalWarmupAsCompleted,
-    undoGlobalWarmup, // Adicionada ao valor do contexto
+    undoGlobalWarmup,
     completeSession,
     deleteSession,
     hasActiveSession,
@@ -247,7 +244,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updateUserSettings,
   };
 
-  if (!isMounted) return null;
+  if (!isMounted) return null; // Ou um loader/skeleton global
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

@@ -3,6 +3,16 @@
 
 import type { ModelExercise, Exercise, Workout, UserSettings } from './types';
 import { modelExerciseData } from './model-exercises';
+import { startOfToday, addDays } from 'date-fns';
+
+// Helper function to shuffle an array
+function shuffleArray<T>(array: T[]): T[] {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
 
 // Copied from src/app/builder/page.tsx and adapted
 function determineModelExerciseWarmup(exerciseDetails?: ModelExercise): boolean {
@@ -119,7 +129,7 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
     ],
     hasGlobalWarmup: true,
   },
-  "CoreEAcessorios": { // Chave alterada para evitar espaços e caracteres especiais
+  "CoreEAcessorios": {
     name: "Treino Modelo - Core e Acessórios",
     description: "Exercícios para fortalecer o abdômen e lombar.",
     targetMuscleGroups: [
@@ -141,52 +151,75 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
 
 export function generateWorkoutFromTemplate(
   templateKey: string,
-  userSettings: UserSettings
-): Omit<Workout, 'id' | 'repeatFrequencyDays' | 'deadline'> | null {
+  userSettings: UserSettings,
+  existingWorkouts: Workout[] = [] // Novo parâmetro com valor padrão
+): Omit<Workout, 'id'> | null {
   const template = workoutTemplates[templateKey];
   if (!template) {
     console.error(`Template não encontrado: ${templateKey}`);
     return null;
   }
 
-  const exercises: Exercise[] = [];
-  const usedExerciseNames = new Set<string>();
-  const assignedWarmupForGroup = new Set<string>(); // Tracks groups that got a warmup exercise
+  const generatedExercises: Exercise[] = [];
+  const usedExerciseNamesInCurrentWorkout = new Set<string>();
+  const assignedWarmupForGroup = new Set<string>();
+
+  const allExistingExerciseNames = new Set<string>();
+  existingWorkouts.forEach(workout => {
+      workout.exercises.forEach(ex => allExistingExerciseNames.add(ex.name));
+  });
+
+  const allModelExercisesFlat = Object.values(modelExerciseData).flat();
 
   template.targetMuscleGroups.forEach(target => {
-    // Prioritize exercises where the target group is listed first
-    let modelExercisesForGroup = Object.values(modelExerciseData)
-      .flat()
-      .filter(ex => ex.muscleGroups.includes(target.group) && !usedExerciseNames.has(ex.name) && ex.muscleGroups[0] === target.group);
+    const exercisesForThisGroupTarget: ModelExercise[] = [];
+    
+    let candidates = allModelExercisesFlat.filter(modelEx => 
+        modelEx.muscleGroups.includes(target.group) && 
+        !usedExerciseNamesInCurrentWorkout.has(modelEx.name)
+    );
 
-    // If not enough primary exercises, get any exercise that includes the target group
-    if (modelExercisesForGroup.length < target.count) {
-        const additionalExercises = Object.values(modelExerciseData)
-            .flat()
-            .filter(ex => ex.muscleGroups.includes(target.group) && !usedExerciseNames.has(ex.name) && !modelExercisesForGroup.some(me => me.name === ex.name));
-        modelExercisesForGroup = [...modelExercisesForGroup, ...additionalExercises.filter(addEx => !modelExercisesForGroup.find(me => me.name === addEx.name))]; // Ensure no duplicates if already added
+    const brandNewCandidates = candidates.filter(c => !allExistingExerciseNames.has(c.name));
+    const existingElsewhereCandidates = candidates.filter(c => allExistingExerciseNames.has(c.name));
+
+    shuffleArray(brandNewCandidates);
+    shuffleArray(existingElsewhereCandidates);
+
+    let needed = target.count;
+
+    for (const newEx of brandNewCandidates) {
+        if (needed === 0) break;
+        exercisesForThisGroupTarget.push(newEx);
+        usedExerciseNamesInCurrentWorkout.add(newEx.name);
+        needed--;
+    }
+
+    if (needed > 0) {
+        for (const existingEx of existingElsewhereCandidates) {
+            if (needed === 0) break;
+            if (!usedExerciseNamesInCurrentWorkout.has(existingEx.name)) { 
+                exercisesForThisGroupTarget.push(existingEx);
+                usedExerciseNamesInCurrentWorkout.add(existingEx.name);
+                needed--;
+            }
+        }
     }
     
-    const shuffled = modelExercisesForGroup.sort(() => 0.5 - Math.random());
-    const selectedExercises = shuffled.slice(0, target.count);
-
-    if (selectedExercises.length < target.count) {
-        console.warn(`Não foram encontrados exercícios suficientes para o grupo ${target.group} no modelo ${templateKey}. Encontrados: ${selectedExercises.length}, Pedidos: ${target.count}`);
+    if (exercisesForThisGroupTarget.length < target.count) {
+      console.warn(`Não foram encontrados exercícios suficientes para o grupo ${target.group} no modelo ${templateKey} após considerar os existentes. Encontrados: ${exercisesForThisGroupTarget.length}, Pedidos: ${target.count}`);
     }
 
-    selectedExercises.forEach(modelEx => {
+    exercisesForThisGroupTarget.forEach(modelEx => {
       let exerciseSpecificWarmup = false;
-      // Determine if this exercise type should have a warmup
       if (determineModelExerciseWarmup(modelEx)) {
-        // For Mini templates (count: 1) or the first eligible exercise in a normal template for that group
         if (target.count === 1 || !assignedWarmupForGroup.has(target.group)) {
           exerciseSpecificWarmup = true;
-          assignedWarmupForGroup.add(target.group); // Mark that this group has received a warmup exercise
+          assignedWarmupForGroup.add(target.group);
         }
       }
 
-      exercises.push({
-        id: generateId(),
+      generatedExercises.push({
+        id: generateId(), // ID temporário, AppContext pode gerar o final se necessário
         name: modelEx.name,
         sets: userSettings.defaultSets,
         reps: userSettings.defaultReps,
@@ -195,26 +228,41 @@ export function generateWorkoutFromTemplate(
         notes: modelEx.description,
         hasWarmup: exerciseSpecificWarmup,
       });
-      usedExerciseNames.add(modelEx.name);
     });
   });
 
-  if (exercises.length === 0) {
+  if (generatedExercises.length === 0 && template.targetMuscleGroups.length > 0) {
       console.warn(`Nenhum exercício gerado para o modelo: ${templateKey}`);
-      // Return a workout with an empty exercise list instead of null if the template itself exists
-      // This might be better for UI handling if a template is valid but finds no exercises
-      return {
-        name: template.name,
-        description: template.description,
-        exercises: [],
-        hasGlobalWarmup: template.hasGlobalWarmup !== undefined ? template.hasGlobalWarmup : true,
-      };
+  }
+
+  let finalRepeatFrequencyDays: number | undefined = undefined;
+  let finalDeadline: string | undefined = undefined;
+
+  if (templateKey.includes("_Mini")) {
+    const majorMuscleGroups = [
+      'Peito', 'Costas', 
+      'Pernas (Quadríceps)', 'Pernas (Posteriores)', 'Glúteos', 
+      'Lombar'
+    ];
+    let calculatedRepeatFrequency = 1; // Default para mini (músculos menores)
+
+    for (const exercise of generatedExercises) {
+        if (exercise.muscleGroups?.some(group => majorMuscleGroups.includes(group))) {
+            calculatedRepeatFrequency = 2;
+            break;
+        }
+    }
+    finalRepeatFrequencyDays = calculatedRepeatFrequency;
+    const today = startOfToday();
+    finalDeadline = addDays(today, finalRepeatFrequencyDays).toISOString();
   }
 
   return {
     name: template.name,
     description: template.description,
-    exercises,
+    exercises: generatedExercises,
     hasGlobalWarmup: template.hasGlobalWarmup !== undefined ? template.hasGlobalWarmup : true,
+    repeatFrequencyDays: finalRepeatFrequencyDays,
+    deadline: finalDeadline,
   };
 }

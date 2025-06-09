@@ -97,9 +97,9 @@ export default function WorkoutLibraryPage() {
   };
 
   const handleCreateWorkoutFromTemplate = (templateKey: string) => {
-    const generatedWorkoutData = generateWorkoutFromTemplate(templateKey, userSettings);
+    const generatedWorkoutData = generateWorkoutFromTemplate(templateKey, userSettings, workouts);
     if (generatedWorkoutData) {
-      addContextWorkout(generatedWorkoutData);
+      addContextWorkout(generatedWorkoutData); // AppContext.addWorkout espera Omit<Workout, 'id'>
       toast({
         title: "Treino Modelo Adicionado!",
         description: `O treino "${generatedWorkoutData.name}" foi adicionado à sua biblioteca.`
@@ -187,7 +187,7 @@ export default function WorkoutLibraryPage() {
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 max-h-32 overflow-y-auto">
                     {workout.exercises.slice(0,3).map((exercise) => (
                       <li key={exercise.id} className="truncate" title={formatExerciseDisplay(exercise)}>
-                        {exercise.hasWarmup && <Flame className="inline h-3 w-3 mr-1 text-orange-500" />}
+                        {exercise.hasWarmup && <Flame className="inline h-3 w-3 mr-1 text-orange-500" title="Aquecimento para este exercício incluído" />}
                         {exercise.name} ({exercise.sets}x{exercise.reps})
                         {exercise.muscleGroups && exercise.muscleGroups.length > 0 &&
                           <span className="text-xs ml-1">({exercise.muscleGroups.slice(0,2).join(', ')}{exercise.muscleGroups.length > 2 ? '...' : ''})</span>}
