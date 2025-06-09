@@ -10,7 +10,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { useState, useCallback, useId } from 'react';
+import { useState, useCallback, useId, useMemo } from 'react';
 import type { Workout, WorkoutSession, SessionExercisePerformance } from '@/lib/types';
 import { DeadlineUpdateModal } from '@/components/DeadlineUpdateModal';
 import { TrackWorkoutModal } from '@/components/TrackWorkoutModal';
@@ -45,7 +45,21 @@ export default function ProgressTrackingPage() {
 
   const workoutForTrackingModal = trackingSession ? getWorkoutById(trackingSession.workoutId) : undefined;
 
-  const sortedSessions = [...sessions].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const sortedSessions = useMemo(() => {
+    return [...sessions].sort((a, b) => {
+      // Prioridade 1: Sessões não concluídas primeiro
+      if (!a.isCompleted && b.isCompleted) {
+        return -1; // a vem antes de b
+      }
+      if (a.isCompleted && !b.isCompleted) {
+        return 1; // b vem antes de a
+      }
+
+      // Prioridade 2: Data (mais recente primeiro)
+      // Isso se aplica se ambas as sessões têm o mesmo status de 'isCompleted'
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
+  }, [sessions]);
 
   const openTrackWorkoutModal = (session: WorkoutSession) => {
     setTrackingSession(session);
@@ -265,3 +279,4 @@ export default function ProgressTrackingPage() {
     </AppLayout>
   );
 }
+
