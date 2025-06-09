@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Trash2, Save, Target, BookOpenCheck, CalendarIcon, Flame, ArrowUp, ArrowDown } from 'lucide-react';
+import { PlusCircle, Trash2, Save, Target, BookOpenCheck, CalendarIcon, Flame, ArrowUp, ArrowDown, BarChartHorizontalBig } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import type { Exercise, ModelExercise, Workout } from '@/lib/types';
@@ -28,6 +28,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { format, parseISO, addDays, startOfToday, isBefore, isEqual } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { Separator } from '@/components/ui/separator';
 
 const baseExerciseSchema = z.object({
   id: z.string().optional(),
@@ -92,6 +93,9 @@ const workoutFormSchema = z.object({
 });
 
 type WorkoutFormData = z.infer<typeof workoutFormSchema>;
+interface MuscleGroupSummary {
+  [groupName: string]: number;
+}
 
 const generateId = () => crypto.randomUUID();
 
@@ -123,6 +127,7 @@ export default function WorkoutBuilderPage() {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false);
   const [selectedExerciseCategory, setSelectedExerciseCategory] = useState<string | null>(null);
+  const [currentWorkoutMuscleSummary, setCurrentWorkoutMuscleSummary] = useState<MuscleGroupSummary>({});
 
   const form = useForm<WorkoutFormData>({
     resolver: zodResolver(workoutFormSchema),
@@ -195,7 +200,7 @@ export default function WorkoutBuilderPage() {
         if (formExercises.length > 0) {
             setTimeout(() => {
                 const currentExercisesInForm = form.getValues('exercises');
-                updateWorkoutFrequencyAndSuggestDeadline(currentExercisesInForm);
+                updateWorkoutFrequencyAndSuggestDeadline(currentExercises);
             }, 0);
         }
       } else {
@@ -226,6 +231,23 @@ export default function WorkoutBuilderPage() {
 
 
   const watchedRepeatFrequencyDays = form.watch('repeatFrequencyDays');
+  const watchedExercises = form.watch('exercises');
+
+  useEffect(() => {
+    const summary: MuscleGroupSummary = {};
+    watchedExercises.forEach(ex => {
+        if (ex && ex.name && ex.name.trim() !== '') {
+            const setsValue = typeof ex.sets === 'string' ? parseInt(ex.sets, 10) : ex.sets;
+            if (typeof setsValue === 'number' && !isNaN(setsValue) && setsValue > 0) {
+                (ex.muscleGroups || []).forEach(group => {
+                    summary[group] = (summary[group] || 0) + setsValue;
+                });
+            }
+        }
+    });
+    setCurrentWorkoutMuscleSummary(summary);
+  }, [watchedExercises]);
+
 
   useEffect(() => {
     if (!isInitialLoadDoneRef.current) return;
@@ -319,8 +341,8 @@ export default function WorkoutBuilderPage() {
       exercises: values.exercises.map(ex => ({
         id: ex.id || generateId(),
         name: ex.name,
-        sets: ex.sets as number,
-        reps: ex.reps as string,
+        sets: ex.sets as number, // Zod ensures this is a number if valid
+        reps: ex.reps as string, // Zod ensures this is a string if valid
         weight: ex.weight || undefined,
         muscleGroups: ex.muscleGroups || [],
         notes: ex.notes || undefined,
@@ -668,6 +690,25 @@ export default function WorkoutBuilderPage() {
                     Séries de aquecimento em exercícios modelo são marcadas por padrão, exceto para alguns exercícios específicos (ex: Cardio regular, Prancha).
                     O aquecimento geral do treino (na esteira) pode ser configurado nos Detalhes do Treino.
                 </FormDescription>
+                
+                {Object.keys(currentWorkoutMuscleSummary).length > 0 && (
+                  <div className="mt-6 pt-4 border-t">
+                    <h4 className="text-md font-semibold mb-2 flex items-center gap-2">
+                      <BarChartHorizontalBig className="h-5 w-5 text-primary" />
+                      Resumo de Séries por Grupo Muscular (Atual)
+                    </h4>
+                    <ul className="space-y-1 text-sm text-muted-foreground grid grid-cols-2 md:grid-cols-3 gap-x-4">
+                      {Object.entries(currentWorkoutMuscleSummary)
+                        .sort(([groupA], [groupB]) => groupA.localeCompare(groupB))
+                        .map(([group, count]) => (
+                        <li key={group} className="flex justify-between">
+                          <span className="font-medium text-foreground">{group}:</span> 
+                          <span>{count} séries</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
               </CardContent>
               <CardFooter>
@@ -710,3 +751,6 @@ export default function WorkoutBuilderPage() {
     </AppLayout>
   );
 }
+
+
+    
