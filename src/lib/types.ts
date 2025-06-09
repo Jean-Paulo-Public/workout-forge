@@ -30,6 +30,7 @@ export interface SessionExercisePerformance {
   hasWarmup?: boolean; // Copied from exercise for easier access in modal
   isWarmupCompleted?: boolean; // Tracks if the warmup for this specific exercise is done
   isExerciseCompleted?: boolean; // Tracks if this specific exercise is done
+  restTimeSeconds?: number; // Actual rest time recorded in seconds
 }
 
 export interface WorkoutSession {
@@ -46,6 +47,7 @@ export interface WorkoutSession {
 export interface UserSettings {
   defaultSets: number;
   defaultReps: string;
+  defaultRestAlarmSeconds: number; // Default alarm time for rest timer in seconds
 }
 
 // Tipos para Exercícios Modelo

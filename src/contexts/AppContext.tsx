@@ -4,6 +4,8 @@
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { Workout, WorkoutSession, UserSettings, Exercise, SessionExercisePerformance } from '@/lib/types';
+import { differenceInDays, parseISO, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+
 
 interface AppContextType {
   workouts: Workout[];
@@ -22,6 +24,7 @@ interface AppContextType {
   deleteSession: (sessionId: string) => void;
   hasActiveSession: (workoutId: string) => boolean;
   getLastUsedWeightForExercise: (workoutId: string, exerciseId: string) => string | undefined;
+  getAverageRestTimeForExercise: (exerciseId: string, lastNDays?: number) => number | null;
 
 
   userSettings: UserSettings;
@@ -35,6 +38,7 @@ const generateId = () => crypto.randomUUID();
 const DEFAULT_USER_SETTINGS: UserSettings = {
   defaultSets: 3,
   defaultReps: '8',
+  defaultRestAlarmSeconds: 180, // 3 minutes
 };
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -53,7 +57,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const storedUserSettings = localStorage.getItem('userSettings');
     if (storedUserSettings) {
-      setUserSettingsState(JSON.parse(storedUserSettings));
+      setUserSettingsState(prev => ({ ...DEFAULT_USER_SETTINGS, ...JSON.parse(storedUserSettings) }));
     } else {
       setUserSettingsState(DEFAULT_USER_SETTINGS);
     }
@@ -130,6 +134,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       hasWarmup: ex.hasWarmup || false,
       isWarmupCompleted: false,
       isExerciseCompleted: false,
+      restTimeSeconds: undefined, // Initialize restTimeSeconds
     }));
 
     const newSession: WorkoutSession = {
@@ -224,9 +229,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return undefined;
   }, [sessions]);
 
+  const getAverageRestTimeForExercise = useCallback((exerciseId: string, lastNDays: number = 30): number | null => {
+    const today = new Date();
+    const pastDate = new Date(today);
+    pastDate.setDate(today.getDate() - lastNDays);
+
+    const relevantRestTimes: number[] = [];
+
+    sessions.forEach(session => {
+      if (session.isCompleted) {
+        const sessionDate = parseISO(session.date);
+        if (isWithinInterval(sessionDate, { start: pastDate, end: today })) {
+          session.exercisePerformances.forEach(perf => {
+            if (perf.exerciseId === exerciseId && typeof perf.restTimeSeconds === 'number') {
+              relevantRestTimes.push(perf.restTimeSeconds);
+            }
+          });
+        }
+      }
+    });
+
+    if (relevantRestTimes.length === 0) return null;
+    const sum = relevantRestTimes.reduce((acc, time) => acc + time, 0);
+    return Math.round(sum / relevantRestTimes.length);
+  }, [sessions]);
+
 
   const updateUserSettings = (newSettings: Partial<UserSettings>) => {
-    setUserSettingsState(prev => ({ ...prev, ...newSettings }));
+    setUserSettingsState(prev => ({ 
+      ...prev, 
+      ...newSettings,
+      defaultRestAlarmSeconds: newSettings.defaultRestAlarmSeconds !== undefined 
+                               ? Number(newSettings.defaultRestAlarmSeconds) 
+                               : prev.defaultRestAlarmSeconds
+    }));
   };
 
   const value = {
@@ -245,6 +281,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     deleteSession,
     hasActiveSession,
     getLastUsedWeightForExercise,
+    getAverageRestTimeForExercise,
     userSettings,
     updateUserSettings,
   };
@@ -261,5 +298,3 @@ export function useAppContext() {
   }
   return context;
 }
-
-    

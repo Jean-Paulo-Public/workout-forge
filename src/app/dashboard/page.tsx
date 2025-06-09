@@ -5,7 +5,7 @@ import { AppLayout } from '@/components/layout/app-layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { LibraryBig, TrendingUp, Settings, Save, Dumbbell, BarChartHorizontalBig } from 'lucide-react';
+import { LibraryBig, TrendingUp, Settings, Save, Dumbbell, BarChartHorizontalBig, AlarmClock } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -21,6 +21,7 @@ import { ptBR } from 'date-fns/locale';
 const userSettingsSchema = z.object({
   defaultSets: z.coerce.number().min(1, "Séries devem ser pelo menos 1."),
   defaultReps: z.string().min(1, "Repetições são obrigatórias."),
+  defaultRestAlarmSeconds: z.coerce.number().min(10, "O alarme de descanso deve ser de pelo menos 10 segundos.").max(600, "O alarme de descanso não pode exceder 600 segundos (10 minutos)."),
 });
 
 type UserSettingsFormData = z.infer<typeof userSettingsSchema>;
@@ -38,6 +39,7 @@ export default function DashboardPage() {
     defaultValues: {
       defaultSets: userSettings.defaultSets,
       defaultReps: userSettings.defaultReps,
+      defaultRestAlarmSeconds: userSettings.defaultRestAlarmSeconds,
     },
   });
 
@@ -53,6 +55,7 @@ export default function DashboardPage() {
     settingsForm.reset({
       defaultSets: userSettings.defaultSets,
       defaultReps: userSettings.defaultReps,
+      defaultRestAlarmSeconds: userSettings.defaultRestAlarmSeconds,
     });
   }, [userSettings, settingsForm]);
 
@@ -145,7 +148,7 @@ export default function DashboardPage() {
                 <Settings className="text-primary" />
                 Configurações Padrão
               </CardTitle>
-              <CardDescription>Defina séries e repetições padrão para novos exercícios.</CardDescription>
+              <CardDescription>Defina padrões para novos exercícios e tempo de alarme para descanso.</CardDescription>
             </CardHeader>
             <Form {...settingsForm}>
               <form onSubmit={settingsForm.handleSubmit(onSettingsSubmit)}>
@@ -172,6 +175,22 @@ export default function DashboardPage() {
                         <FormControl>
                           <Input placeholder="ex: 8-12" {...field} />
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={settingsForm.control}
+                    name="defaultRestAlarmSeconds"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tempo Padrão Alarme de Descanso (segundos)</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="ex: 180" {...field} />
+                        </FormControl>
+                        <FormDescription>
+                          Tempo padrão (em segundos) para o alarme no cronômetro de descanso entre séries. (Mín: 10s, Máx: 600s)
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
