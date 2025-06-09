@@ -13,9 +13,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import type { Workout, WorkoutSession, SessionExercisePerformance } from '@/lib/types';
 import { useAppContext } from '@/contexts/AppContext';
-import { Flame, CheckCircle2, Save, Undo2, Dumbbell, Timer, Clock, X } from 'lucide-react';
+import { Flame, CheckCircle2, Save, Undo2, Dumbbell, Timer, Clock, X, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { RestTimerModal } from '@/components/RestTimerModal'; 
+import { RestTimerModal } from '@/components/RestTimerModal';
 import { useToast } from '@/hooks/use-toast';
 
 const exercisePerformanceSchema = z.object({
@@ -27,7 +27,8 @@ const exercisePerformanceSchema = z.object({
   isExerciseCompleted: z.boolean().optional(),
   plannedWeight: z.string().optional(),
   lastUsedWeight: z.string().optional(),
-  restTimeSeconds: z.number().optional(), 
+  restTimeSeconds: z.number().optional(),
+  averageRestTimeDisplay: z.string().optional(), // Para exibir a média
 });
 
 const trackWorkoutFormSchema = z.object({
@@ -45,13 +46,20 @@ interface TrackWorkoutModalProps {
 }
 
 export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkoutFinallyCompleted }: TrackWorkoutModalProps) {
-  const { updateSessionExercisePerformance, completeSession, getLastUsedWeightForExercise, userSettings } = useAppContext();
+  const { updateSessionExercisePerformance, completeSession, getLastUsedWeightForExercise, userSettings, getAverageRestTimeForExercise } = useAppContext();
   const { toast } = useToast();
   const descriptionId = useId();
 
   const [isRestTimerModalOpen, setIsRestTimerModalOpen] = useState(false);
   const [currentExerciseForRest, setCurrentExerciseForRest] = useState<SessionExercisePerformance | null>(null);
   const [currentExerciseIndexForRest, setCurrentExerciseIndexForRest] = useState<number | null>(null);
+
+  const formatSecondsToMMSS = useCallback((totalSeconds: number | undefined): string => {
+    if (totalSeconds === undefined || totalSeconds === null) return 'N/A';
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  }, []);
 
 
   const form = useForm<TrackWorkoutFormData>({
@@ -71,6 +79,7 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
       const initialPerformances = workout.exercises.map(exercise => {
         const currentPerf = session.exercisePerformances.find(p => p.exerciseId === exercise.id);
         const lastUsedWeight = getLastUsedWeightForExercise(workout.id, exercise.id);
+        const averageRestTime = getAverageRestTimeForExercise(exercise.id, 30);
 
         return {
           exerciseId: exercise.id,
@@ -82,12 +91,13 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
           plannedWeight: exercise.weight || "0",
           lastUsedWeight: lastUsedWeight ?? "N/A",
           restTimeSeconds: currentPerf?.restTimeSeconds,
+          averageRestTimeDisplay: formatSecondsToMMSS(averageRestTime),
         };
       });
       form.reset({ performances: initialPerformances });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, session, workout]);
+  }, [isOpen, session, workout, getAverageRestTimeForExercise, getLastUsedWeightForExercise, formatSecondsToMMSS]);
 
 
   const performancesFromWatch = form.watch('performances');
@@ -131,7 +141,7 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
       updatesToPersist.isWarmupCompleted = false;
       updatedFieldItem.isWarmupCompleted = false;
     } else {
-      return; 
+      return;
     }
     update(index, updatedFieldItem);
     updateSessionExercisePerformance(session.id, fieldItem.exerciseId, updatesToPersist);
@@ -146,7 +156,7 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
 
   const openRestTimer = (performanceData: SessionExercisePerformance, index: number) => {
     const sessionPerf = session.exercisePerformances.find(p => p.exerciseId === performanceData.exerciseId);
-    setCurrentExerciseForRest(sessionPerf || performanceData);
+    setCurrentExerciseForRest(sessionPerf || performanceData); // Pass the most up-to-date perf data
     setCurrentExerciseIndexForRest(index);
     setIsRestTimerModalOpen(true);
   };
@@ -161,13 +171,6 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
     setIsRestTimerModalOpen(false);
     setCurrentExerciseForRest(null);
     setCurrentExerciseIndexForRest(null);
-  };
-
-  const formatSecondsToMMSS = (totalSeconds: number | undefined): string => {
-    if (totalSeconds === undefined || totalSeconds === null) return 'N/A';
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
   };
 
   const handleClearLastRestTime = (index: number) => {
@@ -198,7 +201,7 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
                 <div className="space-y-6">
                   {fields.map((item, index) => {
                     const currentItemState = performancesFromWatch?.[index];
-                    if (!currentItemState) return null; 
+                    if (!currentItemState) return null;
 
                     const canUndo = currentItemState.isExerciseCompleted || (currentItemState.hasWarmup && currentItemState.isWarmupCompleted);
 
@@ -225,27 +228,37 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
                           <p className="text-sm text-muted-foreground">
                               Último Usado: <span className="font-medium text-foreground">{currentItemState.lastUsedWeight || "N/A"}</span>
                           </p>
-                           <div className="text-sm text-muted-foreground col-span-1 sm:col-span-2 flex items-center justify-between">
-                              <div className="flex items-center">
-                                <Clock className="mr-1.5 h-3.5 w-3.5" />
-                                <span>Último descanso registrado: </span>
+
+                          <div className="text-sm text-muted-foreground col-span-1 sm:col-span-2 space-y-0.5">
+                            <div className="flex items-center">
+                                <Info className="mr-1.5 h-3.5 w-3.5 text-blue-500" />
+                                <span>Descanso Médio (30d): </span>
                                 <span className="font-medium text-foreground ml-1">
-                                  {formatSecondsToMMSS(currentItemState.restTimeSeconds)}
+                                  {currentItemState.averageRestTimeDisplay}
                                 </span>
-                              </div>
-                              {currentItemState.restTimeSeconds !== undefined && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                                  onClick={() => handleClearLastRestTime(index)}
-                                  title="Limpar último descanso registrado"
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              )}
                             </div>
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center">
+                                    <Clock className="mr-1.5 h-3.5 w-3.5" />
+                                    <span>Último descanso registrado: </span>
+                                    <span className="font-medium text-foreground ml-1">
+                                    {formatSecondsToMMSS(currentItemState.restTimeSeconds)}
+                                    </span>
+                                </div>
+                                {currentItemState.restTimeSeconds !== undefined && (
+                                    <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                    onClick={() => handleClearLastRestTime(index)}
+                                    title="Limpar último descanso registrado"
+                                    >
+                                    <X className="h-4 w-4" />
+                                    </Button>
+                                )}
+                            </div>
+                          </div>
                       </div>
 
                       <FormField
@@ -343,3 +356,4 @@ export function TrackWorkoutModal({ isOpen, onClose, session, workout, onWorkout
     </>
   );
 }
+
