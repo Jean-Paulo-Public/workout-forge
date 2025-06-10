@@ -59,7 +59,6 @@ export function TrackWorkoutModal({ isOpen, onClose, session: sessionProp, worko
 
   const [isRestTimerModalOpen, setIsRestTimerModalOpen] = useState(false);
   const [currentExerciseForRest, setCurrentExerciseForRest] = useState<SessionExercisePerformance | null>(null);
-  // currentExerciseIndexForRest is not strictly needed anymore if we pass the full performance object
 
   const formatSecondsToMMSS = useCallback((totalSeconds: number | undefined | null): string => {
     if (totalSeconds === undefined || totalSeconds === null || isNaN(totalSeconds)) return 'N/A';
@@ -76,7 +75,7 @@ export function TrackWorkoutModal({ isOpen, onClose, session: sessionProp, worko
     },
   });
 
-  const { fields, update, reset } = useFieldArray({ // Added reset here
+  const { fields, update, reset } = useFieldArray({
     control: form.control,
     name: "performances",
   });
@@ -84,18 +83,14 @@ export function TrackWorkoutModal({ isOpen, onClose, session: sessionProp, worko
   useEffect(() => {
     if (isOpen && sessionProp && workout) {
       const currentSessionFromContext = getSessionById(sessionProp.id);
-      const sessionToUse = currentSessionFromContext || sessionProp; // Use context if available, otherwise prop
+      const sessionToUse = currentSessionFromContext || sessionProp;
 
-      // Filter workout.exercises to ensure we only build form fields for exercises
-      // that are actually present in the *current* version of the workout,
-      // and whose performances are in the *current* version of the session.
       const relevantWorkoutExercises = workout.exercises.filter(woEx =>
         sessionToUse.exercisePerformances.some(spEx => spEx.exerciseId === woEx.id)
       );
 
 
       const initialPerformances = relevantWorkoutExercises.map((exercise: WorkoutExercise) => {
-        // Find performance from the most up-to-date session data
         const currentPerfFromSession = sessionToUse.exercisePerformances.find(p => p.exerciseId === exercise.id);
         const lastUsedWeight = getLastUsedWeightForExercise(workout.id, exercise.id);
         const averageRestTime = getAverageRestTimeForExercise(exercise.id, 30);
@@ -113,7 +108,7 @@ export function TrackWorkoutModal({ isOpen, onClose, session: sessionProp, worko
           averageRestTimeDisplay: formatSecondsToMMSS(averageRestTime),
         };
       });
-      reset({ performances: initialPerformances });
+      reset(initialPerformances);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, sessionProp, workout, getSessionById, getLastUsedWeightForExercise, getAverageRestTimeForExercise, formatSecondsToMMSS, reset]);
@@ -123,9 +118,6 @@ export function TrackWorkoutModal({ isOpen, onClose, session: sessionProp, worko
 
   const allExercisesCompleted = useMemo(() => {
     if (!performancesFromWatch || performancesFromWatch.length === 0) {
-      // If there are no exercises in the form (e.g., workout became empty), consider it "completed"
-      // to allow closing the modal or handling an empty state.
-      // However, if the original workout still has exercises, it's not truly complete.
       return workout.exercises.length === 0;
     }
     return performancesFromWatch.every(p => p.isExerciseCompleted);
@@ -203,7 +195,7 @@ export function TrackWorkoutModal({ isOpen, onClose, session: sessionProp, worko
     if (perfIndex !== -1) {
         const currentPerf = form.getValues(`performances.${perfIndex}`);
         const newRestTimes = [...(currentPerf.restTimes || []) , restSeconds];
-        if (newRestTimes.length > 3) newRestTimes.shift(); // Keep only last 3
+        if (newRestTimes.length > 3) newRestTimes.shift(); 
         update(perfIndex, {...currentPerf, restTimes: newRestTimes});
     }
 
@@ -223,7 +215,7 @@ export function TrackWorkoutModal({ isOpen, onClose, session: sessionProp, worko
     toast({ title: "Último Descanso Removido", description: `O último tempo de descanso para ${fieldItem.exerciseName} foi removido.` });
   };
 
-  if (!isOpen || !sessionProp || !workout) return null; // Ensure isOpen is checked for rendering
+  if (!isOpen || !sessionProp || !workout) return null;
 
   const restLabels = ["Último", "Penúltimo", "Antepenúltimo"];
 
@@ -285,7 +277,7 @@ export function TrackWorkoutModal({ isOpen, onClose, session: sessionProp, worko
                                   {currentItemState.averageRestTimeDisplay}
                                 </span>
                             </div>
-                            {currentRestTimes.slice().reverse().map((time, i) => ( // .slice() to avoid mutating, .reverse() to show newest first
+                            {currentRestTimes.slice().reverse().map((time, i) => (
                                 <div key={i} className="flex items-center justify-between">
                                     <div className="flex items-center">
                                         <Clock className="mr-1.5 h-3.5 w-3.5" />
@@ -294,7 +286,7 @@ export function TrackWorkoutModal({ isOpen, onClose, session: sessionProp, worko
                                             {formatSecondsToMMSS(time)}
                                         </span>
                                     </div>
-                                    {i === 0 && currentRestTimes.length > 0 && ( // Only show 'X' for the most recent (which is now first after reverse)
+                                    {i === 0 && currentRestTimes.length > 0 && (
                                         <Button
                                         type="button"
                                         variant="ghost"
@@ -412,4 +404,3 @@ export function TrackWorkoutModal({ isOpen, onClose, session: sessionProp, worko
   );
 }
 
-    
