@@ -11,12 +11,16 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import type { Workout, WorkoutSession, SessionExercisePerformance, Exercise as WorkoutExercise } from '@/lib/types';
+import type { Workout, WorkoutSession, SessionExercisePerformance, Exercise as WorkoutExercise, ModelExercise } from '@/lib/types';
 import { useAppContext } from '@/contexts/AppContext';
-import { Flame, CheckCircle2, Save, Undo2, Dumbbell, Timer, Clock, X, Info } from 'lucide-react';
+import { Flame, CheckCircle2, Save, Undo2, Dumbbell, Timer, Clock, X, Info, Replace, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { RestTimerModal } from '@/components/RestTimerModal';
 import { useToast } from '@/hooks/use-toast';
+import { ModelExerciseCategoryModal } from '@/components/ModelExerciseCategoryModal';
+import { ModelExerciseSelectionModal } from '@/components/ModelExerciseSelectionModal';
+import { modelExerciseData } from '@/lib/model-exercises/index';
+
 
 const exercisePerformanceSchema = z.object({
   exerciseId: z.string(),
@@ -29,6 +33,10 @@ const exercisePerformanceSchema = z.object({
   lastUsedWeight: z.string().optional(),
   restTimes: z.array(z.number()).optional(),
   averageRestTimeDisplay: z.string().optional(),
+  // Fields for exercise substitution
+  isSubstitution: z.boolean().optional(),
+  originalExerciseId: z.string().optional(),
+  originalExerciseName: z.string().optional(),
 });
 
 const trackWorkoutFormSchema = z.object({
@@ -40,7 +48,7 @@ type TrackWorkoutFormData = z.infer<typeof trackWorkoutFormSchema>;
 interface TrackWorkoutModalProps {
   isOpen: boolean;
   onClose: () => void;
-  session: WorkoutSession; // sessionProp
+  session: WorkoutSession; 
   workout: Workout;
   onWorkoutFinallyCompleted: () => void;
 }
@@ -59,6 +67,13 @@ export function TrackWorkoutModal({ isOpen, onClose, session: sessionProp, worko
 
   const [isRestTimerModalOpen, setIsRestTimerModalOpen] = useState(false);
   const [currentExerciseForRest, setCurrentExerciseForRest] = useState<SessionExercisePerformance | null>(null);
+
+  // State for exercise replacement in tracking modal
+  const [isReplaceCategoryModalOpen, setIsReplaceCategoryModalOpen] = useState(false);
+  const [isReplaceSelectionModalOpen, setIsReplaceSelectionModalOpen] = useState(false);
+  const [selectedReplaceCategory, setSelectedReplaceCategory] = useState<string | null>(null);
+  const [performanceIndexToReplace, setPerformanceIndexToReplace] = useState<number | null>(null);
+
 
   const formatSecondsToMMSS = useCallback((totalSeconds: number | undefined | null): string => {
     if (totalSeconds === undefined || totalSeconds === null || isNaN(totalSeconds)) return 'N/A';
@@ -85,35 +100,52 @@ export function TrackWorkoutModal({ isOpen, onClose, session: sessionProp, worko
       const currentSessionFromContext = getSessionById(sessionProp.id);
       const sessionToUse = currentSessionFromContext || sessionProp;
 
-      // Filter workout.exercises to only include those present in the session's exercisePerformances.
-      // This ensures that if exercises were removed from the workout *after* the session started,
-      // and the session wasn't perfectly synced, we only deal with exercises that have performance entries.
-      // However, the primary source of truth for display should be `workout.exercises`
-      // and we find/create performance entries for them.
-
       const initialPerformances = workout.exercises.map((exercise: WorkoutExercise) => {
-        // Try to find an existing performance record in the session for this exercise.
-        const existingPerfFromSession = sessionToUse.exercisePerformances.find(p => p.exerciseId === exercise.id);
-        const lastUsedWeight = getLastUsedWeightForExercise(workout.id, exercise.id);
-        const averageRestTime = getAverageRestTimeForExercise(exercise.id, 30);
+        const existingPerfFromSession = sessionToUse.exercisePerformances.find(p => p.exerciseId === exercise.id || p.originalExerciseId === exercise.id);
+        
+        if (existingPerfFromSession && existingPerfFromSession.isSubstitution) {
+            // If it's a substitution, load its current state
+            const averageRestTime = getAverageRestTimeForExercise(existingPerfFromSession.exerciseId, 30);
+            return {
+                exerciseId: existingPerfFromSession.exerciseId,
+                exerciseName: existingPerfFromSession.exerciseName,
+                hasWarmup: existingPerfFromSession.hasWarmup,
+                isWarmupCompleted: existingPerfFromSession.isWarmupCompleted,
+                weightUsed: existingPerfFromSession.weightUsed,
+                isExerciseCompleted: existingPerfFromSession.isExerciseCompleted,
+                plannedWeight: existingPerfFromSession.plannedWeight, 
+                lastUsedWeight: "N/A", // For substituted exercises, last used might not be relevant in the same way
+                restTimes: existingPerfFromSession.restTimes || [],
+                averageRestTimeDisplay: formatSecondsToMMSS(averageRestTime),
+                isSubstitution: true,
+                originalExerciseId: existingPerfFromSession.originalExerciseId,
+                originalExerciseName: existingPerfFromSession.originalExerciseName,
+            };
+        } else {
+            // Original exercise or one not yet substituted
+            const lastUsedWeight = getLastUsedWeightForExercise(workout.id, exercise.id);
+            const averageRestTime = getAverageRestTimeForExercise(exercise.id, 30);
+            const perfData = existingPerfFromSession || {}; // Use existing data if available, otherwise empty for defaults
 
-        // If an existing performance record is found, use its data. Otherwise, create a default structure.
-        return {
-          exerciseId: exercise.id,
-          exerciseName: exercise.name,
-          hasWarmup: exercise.hasWarmup || false,
-          isWarmupCompleted: existingPerfFromSession?.isWarmupCompleted ?? false,
-          weightUsed: existingPerfFromSession?.weightUsed ?? lastUsedWeight ?? exercise.weight ?? "0",
-          isExerciseCompleted: existingPerfFromSession?.isExerciseCompleted ?? false,
-          plannedWeight: exercise.weight || "N/A",
-          lastUsedWeight: lastUsedWeight ?? "N/A",
-          restTimes: existingPerfFromSession?.restTimes || [],
-          averageRestTimeDisplay: formatSecondsToMMSS(averageRestTime),
-        };
+            return {
+                exerciseId: exercise.id,
+                exerciseName: exercise.name,
+                hasWarmup: exercise.hasWarmup || false,
+                isWarmupCompleted: perfData.isWarmupCompleted ?? false,
+                weightUsed: perfData.weightUsed ?? lastUsedWeight ?? exercise.weight ?? "0",
+                isExerciseCompleted: perfData.isExerciseCompleted ?? false,
+                plannedWeight: exercise.weight || "N/A",
+                lastUsedWeight: lastUsedWeight ?? "N/A",
+                restTimes: perfData.restTimes || [],
+                averageRestTimeDisplay: formatSecondsToMMSS(averageRestTime),
+                isSubstitution: perfData.isSubstitution ?? false,
+                originalExerciseId: perfData.originalExerciseId,
+                originalExerciseName: perfData.originalExerciseName,
+            };
+        }
       });
       form.reset({ performances: initialPerformances });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, sessionProp, workout, getSessionById, getLastUsedWeightForExercise, getAverageRestTimeForExercise, formatSecondsToMMSS, form.reset]);
 
 
@@ -121,13 +153,12 @@ export function TrackWorkoutModal({ isOpen, onClose, session: sessionProp, worko
 
   const allExercisesCompleted = useMemo(() => {
     if (!performancesFromWatch || performancesFromWatch.length === 0) {
-      return workout.exercises.length === 0; // If no exercises in workout, it's "complete"
+        // If there are no exercises in the workout plan, it's complete.
+        // This relies on `workout.exercises` being the source of truth for what "should" be there.
+        // `performancesFromWatch` should mirror `workout.exercises` in structure after initialization/sync.
+        return workout.exercises.length === 0; 
     }
-    // Check if every exercise defined in the *workout* has a corresponding completed performance entry.
-    return workout.exercises.every(woExercise => {
-        const perf = performancesFromWatch.find(p => p.exerciseId === woExercise.id);
-        return perf?.isExerciseCompleted === true;
-    });
+    return performancesFromWatch.every(perf => perf.isExerciseCompleted === true);
   }, [performancesFromWatch, workout.exercises]);
 
 
@@ -163,7 +194,7 @@ export function TrackWorkoutModal({ isOpen, onClose, session: sessionProp, worko
       updatesToPersist.isWarmupCompleted = false;
       updatedFieldItem.isWarmupCompleted = false;
     } else {
-      return;
+      return; // Nothing to undo at this specific step
     }
     update(index, updatedFieldItem);
     updateSessionExercisePerformance(sessionProp.id, fieldItem.exerciseId, updatesToPersist);
@@ -189,6 +220,9 @@ export function TrackWorkoutModal({ isOpen, onClose, session: sessionProp, worko
         plannedWeight: performanceData.plannedWeight,
         weightUsed: performanceData.weightUsed,
         restTimes: perfFromContext?.restTimes || performanceData.restTimes || [],
+        isSubstitution: performanceData.isSubstitution,
+        originalExerciseId: performanceData.originalExerciseId,
+        originalExerciseName: performanceData.originalExerciseName,
      };
 
     setCurrentExerciseForRest(exercisePerformanceForModal);
@@ -215,12 +249,56 @@ export function TrackWorkoutModal({ isOpen, onClose, session: sessionProp, worko
     if (!fieldItem || !fieldItem.exerciseId || !fieldItem.restTimes || fieldItem.restTimes.length === 0) return;
 
     const updatedRestTimesArray = [...fieldItem.restTimes];
-    updatedRestTimesArray.pop();
+    updatedRestTimesArray.pop(); // Remove the last (most recent) rest time
 
     update(index, { ...fieldItem, restTimes: updatedRestTimesArray });
     updateSessionExercisePerformance(sessionProp.id, fieldItem.exerciseId, { restTimes: updatedRestTimesArray });
     toast({ title: "Último Descanso Removido", description: `O último tempo de descanso para ${fieldItem.exerciseName} foi removido.` });
   };
+
+  const handleOpenReplaceCategoryModal = (index: number) => {
+    setPerformanceIndexToReplace(index);
+    setIsReplaceCategoryModalOpen(true);
+  };
+
+  const handleReplaceCategorySelected = (category: string) => {
+    setSelectedReplaceCategory(category);
+    setIsReplaceCategoryModalOpen(false);
+    setIsReplaceSelectionModalOpen(true);
+  };
+
+  const handleReplaceExerciseSelected = (modelExercise: ModelExercise) => {
+    // This is where the actual replacement logic for the session will go in Phase 2
+    // For now, it just closes the modals.
+    if (performanceIndexToReplace !== null) {
+        const originalPerformance = form.getValues(`performances.${performanceIndexToReplace}`);
+        console.log("Original exercise to replace:", originalPerformance.exerciseName);
+        console.log("Replacing with model exercise:", modelExercise.name);
+        
+        // Placeholder for Phase 2:
+        // 1. Create a new SessionExercisePerformance object based on modelExercise
+        //    - Set isSubstitution = true
+        //    - Set originalExerciseId = originalPerformance.exerciseId
+        //    - Set originalExerciseName = originalPerformance.exerciseName
+        //    - Populate sets, reps from userSettings (or decide strategy)
+        //    - Populate weight from modelExercise.defaultWeight
+        // 2. Call a new method in AppContext, e.g., replaceSessionExercisePerformance(...)
+        //    This method would update the session's exercisePerformances array.
+        // 3. Update the RHF form locally (using `update` from `useFieldArray`)
+
+        toast({
+          title: "Troca de Exercício (Em Breve)",
+          description: `A lógica para trocar ${originalPerformance.exerciseName} por ${modelExercise.name} nesta sessão será implementada.`,
+          variant: "default",
+          duration: 5000,
+        });
+    }
+
+    setIsReplaceSelectionModalOpen(false);
+    setSelectedReplaceCategory(null);
+    setPerformanceIndexToReplace(null);
+  };
+
 
   if (!isOpen || !sessionProp || !workout) return null;
 
@@ -264,10 +342,16 @@ export function TrackWorkoutModal({ isOpen, onClose, session: sessionProp, worko
 
                     return (
                     <div key={item.id} className="p-4 border rounded-md bg-card shadow-sm">
-                      <div className="flex justify-between items-center mb-3">
+                      <div className="flex justify-between items-start mb-1">
                           <h3 className="font-semibold text-lg">{currentItemState.exerciseName}</h3>
                           {statusBadge}
                       </div>
+                      {currentItemState.isSubstitution && currentItemState.originalExerciseName && (
+                        <Badge variant="outline" className="text-xs mb-2 bg-yellow-100 text-yellow-800 border-yellow-300">
+                            <AlertTriangle className="mr-1 h-3 w-3 text-yellow-600" />
+                            Substituído (Original: {currentItemState.originalExerciseName})
+                        </Badge>
+                      )}
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 mb-3">
                           <p className="text-sm text-muted-foreground">
@@ -330,7 +414,7 @@ export function TrackWorkoutModal({ isOpen, onClose, session: sessionProp, worko
                                   if (currentItemState.exerciseId) {
                                     updateSessionExercisePerformance(
                                       sessionProp.id,
-                                      currentItemState.exerciseId,
+                                      currentItemState.exerciseId, // Use current exerciseId, even if it's a substitution
                                       { weightUsed: weightToSave }
                                     );
                                   }
@@ -367,6 +451,17 @@ export function TrackWorkoutModal({ isOpen, onClose, session: sessionProp, worko
                           {canUndo && (
                               <Button type="button" size="sm" variant="ghost" onClick={() => handleUndoAction(index)}>
                                   <Undo2 className="mr-2 h-4 w-4" /> Desfazer Etapa
+                              </Button>
+                          )}
+                          {!currentItemState.isExerciseCompleted && (
+                             <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleOpenReplaceCategoryModal(index)}
+                                title="Trocar este exercício para esta sessão"
+                              >
+                                <Replace className="mr-2 h-4 w-4" /> Trocar Exercício
                               </Button>
                           )}
                       </div>
@@ -406,6 +501,29 @@ export function TrackWorkoutModal({ isOpen, onClose, session: sessionProp, worko
           workoutId={workout.id}
           defaultAlarmTimeSeconds={userSettings.defaultRestAlarmSeconds}
           onSaveRestTime={handleSaveRestTime}
+        />
+      )}
+
+      {/* Modals for replacing exercise during tracking */}
+      <ModelExerciseCategoryModal
+        isOpen={isReplaceCategoryModalOpen}
+        onClose={() => {
+            setIsReplaceCategoryModalOpen(false);
+            setPerformanceIndexToReplace(null);
+        }}
+        onSelectCategory={handleReplaceCategorySelected}
+      />
+      {selectedReplaceCategory && performanceIndexToReplace !== null && (
+        <ModelExerciseSelectionModal
+          isOpen={isReplaceSelectionModalOpen}
+          onClose={() => {
+            setIsReplaceSelectionModalOpen(false);
+            setSelectedReplaceCategory(null);
+            setPerformanceIndexToReplace(null);
+          }}
+          category={selectedReplaceCategory}
+          exercises={modelExerciseData[selectedReplaceCategory] || []}
+          onSelectExercise={handleReplaceExerciseSelected}
         />
       )}
     </>
