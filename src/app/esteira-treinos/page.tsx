@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 
 interface WorkoutWithStatus extends Workout {
   isOverdue?: boolean;
-  daysUntilDeadline?: number;
+  daysDifferenceFromDeadline?: number; // Can be positive (until) or negative (overdue)
   isTodayDeadline?: boolean;
 }
 
@@ -43,7 +43,7 @@ function getDeadlineDisplayInfo(workout: WorkoutWithStatus): DeadlineDisplayInfo
 
   if (workout.deadline) {
     if (workout.isOverdue) {
-      info.statusText = " (Vencido)";
+      info.statusText = ` (Vencido há ${Math.abs(workout.daysDifferenceFromDeadline!)} dia(s))`;
       info.cardClasses = cn(baseCardClasses, "border-red-500 ring-2 ring-red-500/50");
       info.alertIcon = <AlertTriangle className="h-5 w-5 text-red-500" title="Deadline Vencido!" />;
       info.deadlineTextColorClass = "text-red-600 font-medium";
@@ -52,13 +52,13 @@ function getDeadlineDisplayInfo(workout: WorkoutWithStatus): DeadlineDisplayInfo
       info.cardClasses = cn(baseCardClasses, "border-orange-500 ring-2 ring-orange-500/50");
       info.alertIcon = <AlertTriangle className="h-5 w-5 text-orange-500" title="Deadline Hoje!" />;
       info.deadlineTextColorClass = "text-orange-600 font-medium";
-    } else if (workout.daysUntilDeadline === 1) {
+    } else if (workout.daysDifferenceFromDeadline === 1) {
       info.statusText = " (Amanhã!)";
       info.cardClasses = cn(baseCardClasses, "border-yellow-500 ring-2 ring-yellow-500/50");
       info.alertIcon = <AlertTriangle className="h-5 w-5 text-yellow-500" title="Deadline Amanhã!" />;
       info.deadlineTextColorClass = "text-yellow-600 font-medium";
-    } else if (workout.daysUntilDeadline !== undefined && workout.daysUntilDeadline > 1) {
-      info.statusText = ` (em ${workout.daysUntilDeadline} dias)`;
+    } else if (workout.daysDifferenceFromDeadline !== undefined && workout.daysDifferenceFromDeadline > 1) {
+      info.statusText = ` (em ${workout.daysDifferenceFromDeadline} dia(s))`;
     }
   }
   return info;
@@ -77,76 +77,85 @@ export default function TrainingMatPage() {
     const availableWorkouts = workouts.filter(workout => {
       const completedSessionsForThisWorkout = sessions.filter(s => s.workoutId === workout.id && s.isCompleted);
 
-      if ((workout.repeatFrequencyDays && workout.repeatFrequencyDays > 0) && completedSessionsForThisWorkout.length === 0) {
+      // Condition 1: Workout has repeatFrequencyDays and has never been completed
+      if (workout.repeatFrequencyDays && workout.repeatFrequencyDays > 0 && completedSessionsForThisWorkout.length === 0) {
         return true;
       }
+      
+      // Condition 2: Workout has daysForDeadline (implying a deadline logic) and has never been completed
+      if (workout.daysForDeadline && workout.daysForDeadline > 0 && completedSessionsForThisWorkout.length === 0) {
+        return true;
+      }
+
+      // Condition 3: Workout has repeatFrequencyDays and has been completed, check if it's time to repeat
+      if (workout.repeatFrequencyDays && workout.repeatFrequencyDays > 0 && completedSessionsForThisWorkout.length > 0) {
+        const completedSessionsSorted = completedSessionsForThisWorkout
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const lastCompletionDate = startOfToday(parseISO(completedSessionsSorted[0].date));
+        const nextAvailableDate = addDays(lastCompletionDate, workout.repeatFrequencyDays);
+        if (isEqual(todayAtStart, nextAvailableDate) || isBefore(nextAvailableDate, todayAtStart)) {
+          return true;
+        }
+      }
+      
+      // Condition 4: Workout has a deadline but no repeatFrequencyDays, and is not yet completed (or its deadline makes it relevant)
+      // This mainly ensures workouts with only deadlines (and not yet completed) appear.
+      // If completed, their deadline would be updated or they wouldn't appear unless repeatFrequencyDays makes them available.
       if (workout.deadline && completedSessionsForThisWorkout.length === 0) {
-         return true;
-      }
-
-      if (!workout.repeatFrequencyDays || workout.repeatFrequencyDays <= 0) {
-        return false;
-      }
-
-      const completedSessionsSorted = sessions
-        .filter(s => s.workoutId === workout.id && s.isCompleted)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-      if (completedSessionsSorted.length === 0) {
         return true;
       }
-
-      const lastCompletionDate = startOfToday(parseISO(completedSessionsSorted[0].date));
-      const nextAvailableDate = addDays(lastCompletionDate, workout.repeatFrequencyDays as number);
-
-      return isEqual(todayAtStart, nextAvailableDate) || isBefore(nextAvailableDate, todayAtStart);
+      
+      // If none of the above, it's not available based on repeatFrequencyDays or initial deadline status
+      return false;
     });
 
     const workoutsWithStatus: WorkoutWithStatus[] = availableWorkouts.map(workout => {
       let isOverdue = false;
-      let daysUntilDeadline: number | undefined = undefined;
+      let daysDifferenceFromDeadline: number | undefined = undefined;
       let isTodayDeadline = false;
+      let effectiveDeadline: Date | null = null;
 
       if (workout.deadline) {
-        const deadlineDate = parseISO(workout.deadline);
-        isOverdue = isBefore(deadlineDate, todayAtStart);
-        daysUntilDeadline = differenceInDays(deadlineDate, todayAtStart);
-        isTodayDeadline = isToday(deadlineDate);
+        effectiveDeadline = parseISO(workout.deadline);
+      } else if (workout.daysForDeadline && workout.daysForDeadline > 0) {
+        // If no explicit deadline, but daysForDeadline exists, calculate one from today
+        // This is for workouts that haven't been completed yet but have a schedule.
+        const completedSessionsForThisWorkout = sessions.filter(s => s.workoutId === workout.id && s.isCompleted);
+        if (completedSessionsForThisWorkout.length === 0) {
+            effectiveDeadline = addDays(todayAtStart, workout.daysForDeadline);
+        }
       }
-      return { ...workout, isOverdue, daysUntilDeadline, isTodayDeadline };
+      
+      if (effectiveDeadline) {
+        isOverdue = isBefore(effectiveDeadline, todayAtStart);
+        daysDifferenceFromDeadline = differenceInDays(effectiveDeadline, todayAtStart);
+        isTodayDeadline = isToday(effectiveDeadline);
+      }
+
+      return { ...workout, isOverdue, daysDifferenceFromDeadline, isTodayDeadline, deadline: effectiveDeadline?.toISOString() };
     });
 
     workoutsWithStatus.sort((a, b) => {
+      const aEffectiveDeadline = a.deadline ? parseISO(a.deadline) : null;
+      const bEffectiveDeadline = b.deadline ? parseISO(b.deadline) : null;
+
       if (a.isOverdue && !b.isOverdue) return -1;
       if (!a.isOverdue && b.isOverdue) return 1;
-      if (a.isOverdue && b.isOverdue) {
-        return (a.daysUntilDeadline ?? -Infinity) - (b.daysUntilDeadline ?? -Infinity);
+      if (a.isOverdue && b.isOverdue) { // Both overdue
+        return (a.daysDifferenceFromDeadline ?? Infinity) - (b.daysDifferenceFromDeadline ?? Infinity); // More overdue first
       }
 
       if (a.isTodayDeadline && !b.isTodayDeadline) return -1;
       if (!a.isTodayDeadline && b.isTodayDeadline) return 1;
-      if (a.isTodayDeadline && b.isTodayDeadline) {
-        return a.name.localeCompare(b.name);
+      
+      if (aEffectiveDeadline && bEffectiveDeadline) {
+        if (isEqual(aEffectiveDeadline, bEffectiveDeadline)) return a.name.localeCompare(b.name);
+        return differenceInDays(aEffectiveDeadline, bEffectiveDeadline);
       }
-
-      const aIsTomorrow = !a.isOverdue && !a.isTodayDeadline && a.daysUntilDeadline === 1;
-      const bIsTomorrow = !b.isOverdue && !b.isTodayDeadline && b.daysUntilDeadline === 1;
-      if (aIsTomorrow && !bIsTomorrow) return -1;
-      if (!aIsTomorrow && bIsTomorrow) return 1;
-      if (aIsTomorrow && bIsTomorrow) {
-         return a.name.localeCompare(b.name);
-      }
-
-      if (a.daysUntilDeadline !== undefined && b.daysUntilDeadline === undefined) return -1;
-      if (a.daysUntilDeadline === undefined && b.daysUntilDeadline !== undefined) return 1;
-      if (a.daysUntilDeadline !== undefined && b.daysUntilDeadline !== undefined) {
-        if (a.daysUntilDeadline === b.daysUntilDeadline) {
-            return a.name.localeCompare(b.name);
-        }
-        return a.daysUntilDeadline - b.daysUntilDeadline;
-      }
-
-      return a.name.localeCompare(b.name);
+      if (aEffectiveDeadline) return -1; // a has deadline, b doesn't
+      if (bEffectiveDeadline) return 1;  // b has deadline, a doesn't
+      
+      return a.name.localeCompare(b.name); // Default sort by name
     });
 
     setDisplayableWorkouts(workoutsWithStatus);
@@ -189,9 +198,9 @@ export default function TrainingMatPage() {
       <div className="space-y-6">
         <h1 className="text-3xl font-bold font-headline">Esteira de Treinos</h1>
         <CardDescription>
-          Aqui estão os treinos prontos para serem feitos, considerando sua frequência e datas limite.
-          Treinos com deadline vencido, hoje, ou amanhã aparecem primeiro e destacados.
-          Treinos com frequência definida e nunca realizados também são listados.
+          Treinos prontos para serem feitos, considerando seus dias de descanso mínimo e datas limite.
+          Treinos com deadline vencido, hoje ou para breve aparecem primeiro e destacados.
+          Treinos com frequência/dias para deadline definidos e nunca realizados também são listados.
         </CardDescription>
 
         {displayableWorkouts.length === 0 ? (
@@ -204,11 +213,8 @@ export default function TrainingMatPage() {
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground mb-2">
-                Nenhum treino está pronto para ser repetido, não há treinos com deadline definidos para hoje/amanhã/vencidos,
-                ou todos os treinos com deadline e frequência já foram concluídos e aguardam o próximo ciclo.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Certifique-se de que seus treinos na <Link href="/library" className="underline hover:text-primary">biblioteca</Link> tenham uma frequência de repetição e/ou uma data limite.
+                Nenhum treino disponível. Verifique se seus treinos na <Link href="/library" className="underline hover:text-primary">biblioteca</Link> têm "Dias para Deadline" e/ou "Dias de Descanso Mínimo" configurados,
+                ou se os treinos concluídos já cumpriram o descanso mínimo.
               </p>
             </CardContent>
           </Card>
@@ -236,10 +242,15 @@ export default function TrainingMatPage() {
                     <div className="space-y-1">
                       {workout.repeatFrequencyDays && (
                         <CardDescription className="text-xs text-muted-foreground flex items-center">
-                          <Repeat className="h-3 w-3 mr-1" /> Repetir a cada {workout.repeatFrequencyDays} dia(s)
+                          <Repeat className="h-3 w-3 mr-1" /> Descanso mínimo: {workout.repeatFrequencyDays} dia(s)
                         </CardDescription>
                       )}
-                      {workout.deadline && (
+                       {workout.daysForDeadline && !workout.deadline && ( // Show daysForDeadline if no explicit deadline is set yet
+                        <CardDescription className="text-xs text-muted-foreground flex items-center">
+                           <CalendarDays className="h-3 w-3 mr-1" /> Prazo em: {workout.daysForDeadline} dia(s) (a partir de hoje/conclusão)
+                         </CardDescription>
+                      )}
+                      {workout.deadline && ( // This deadline is now the effective one
                          <CardDescription className={cn("text-xs flex items-center", displayInfo.deadlineTextColorClass)}>
                            <CalendarDays className="h-3 w-3 mr-1" /> Deadline: {format(parseISO(workout.deadline), "dd/MM/yyyy", { locale: ptBR })}
                            {displayInfo.statusText}
@@ -278,3 +289,4 @@ export default function TrainingMatPage() {
     </AppLayout>
   );
 }
+

@@ -27,25 +27,27 @@ export function DeadlineUpdateModal({ isOpen, onClose, workout, onSave }: Deadli
   useEffect(() => {
     if (isOpen && workout) {
       const today = startOfToday();
-      let suggestedMinDate = today;
-      if (workout.repeatFrequencyDays && workout.repeatFrequencyDays > 0) {
-        suggestedMinDate = addDays(today, workout.repeatFrequencyDays);
+      let suggestedNewDeadline = today; // Default to today if no daysForDeadline
+
+      if (workout.daysForDeadline && workout.daysForDeadline > 0) {
+        suggestedNewDeadline = addDays(today, workout.daysForDeadline);
+      } else if (workout.deadline) {
+        // If no daysForDeadline but an old deadline exists,
+        // and it's in the past, suggest today. Otherwise, keep current or suggest today.
+        const currentDeadlineDate = parseISO(workout.deadline);
+        suggestedNewDeadline = isBefore(currentDeadlineDate, today) ? today : currentDeadlineDate;
       }
       
-      setMinDate(suggestedMinDate);
+      // The minimum date should generally be today for a new deadline.
+      // Or, if daysForDeadline dictates a future date, that date.
+      const calculatedMinDate = workout.daysForDeadline && workout.daysForDeadline > 0 
+                               ? addDays(today, workout.daysForDeadline)
+                               : today;
+
+      setMinDate(isBefore(calculatedMinDate, today) ? today : calculatedMinDate); // Ensure minDate is not in the past
 
       // Set initial selected date
-      if (workout.deadline) {
-        const currentDeadline = parseISO(workout.deadline);
-        // If current deadline is in the past, or before new minDate, suggest new minDate
-        if (isBefore(currentDeadline, suggestedMinDate)) {
-          setSelectedDate(suggestedMinDate);
-        } else {
-          setSelectedDate(currentDeadline);
-        }
-      } else {
-        setSelectedDate(suggestedMinDate);
-      }
+      setSelectedDate(suggestedNewDeadline);
     }
   }, [isOpen, workout]);
 
@@ -55,11 +57,16 @@ export function DeadlineUpdateModal({ isOpen, onClose, workout, onSave }: Deadli
   };
 
   const handleRemoveDeadline = () => {
-    onSave(workout.id, undefined); // Pass undefined to remove deadline
+    onSave(workout.id, undefined); 
     onClose();
   }
 
   if (!workout) return null;
+
+  const deadlineDescription = workout.daysForDeadline 
+    ? `Sugerimos um novo deadline com base nos 'Dias para Deadline' definidos para este treino (${workout.daysForDeadline} dia(s)).`
+    : `O treino foi concluído. Defina um novo deadline ou remova o existente.`;
+
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -67,8 +74,7 @@ export function DeadlineUpdateModal({ isOpen, onClose, workout, onSave }: Deadli
         <DialogHeader>
           <DialogTitle className="font-headline">Atualizar Deadline para "{workout.name}"</DialogTitle>
           <DialogDescription id={descriptionId}>
-            O treino foi concluído. Sugerimos um novo deadline com base na sua frequência de repetição de {workout.repeatFrequencyDays} dia(s).
-            Você pode confirmar ou alterar a data abaixo, ou remover o deadline.
+            {deadlineDescription} Você pode confirmar, alterar a data abaixo ou remover o deadline.
           </DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-3">
@@ -101,7 +107,7 @@ export function DeadlineUpdateModal({ isOpen, onClose, workout, onSave }: Deadli
             </PopoverContent>
           </Popover>
           <p className="text-xs text-muted-foreground">
-            A data mínima para o novo deadline é {format(minDate, "PPP", { locale: ptBR })}, considerando a frequência de repetição do treino.
+            A data mínima para o novo deadline é {format(minDate, "PPP", { locale: ptBR })}.
           </p>
         </div>
         <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
@@ -120,3 +126,4 @@ function isEqual(date1: Date, date2: Date): boolean {
          date1.getMonth() === date2.getMonth() &&
          date1.getDate() === date2.getDate();
 }
+

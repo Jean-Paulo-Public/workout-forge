@@ -17,7 +17,8 @@ export interface Workout {
   name: string;
   description?: string;
   exercises: Exercise[];
-  repeatFrequencyDays?: number;
+  repeatFrequencyDays?: number; // Minimum rest days before appearing on the mat again
+  daysForDeadline?: number; // Days from completion/creation to set the next deadline
   deadline?: string; // ISO Date string for deadline (opcional)
   hasGlobalWarmup?: boolean; // New field for general warm-up
 }
@@ -61,3 +62,4 @@ export interface ModelExercise {
 export interface ModelExerciseCategories {
   [category: string]: ModelExercise[];
 }
+
