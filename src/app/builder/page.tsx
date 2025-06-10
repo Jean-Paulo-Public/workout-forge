@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Trash2, Save, Target, BookOpenCheck, CalendarIcon, Flame, ArrowUp, ArrowDown, BarChartHorizontalBig } from 'lucide-react';
+import { PlusCircle, Trash2, Save, Target, BookOpenCheck, CalendarIcon, Flame, ArrowUp, ArrowDown, BarChartHorizontalBig, Replace } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import type { Exercise, ModelExercise, Workout } from '@/lib/types';
@@ -125,10 +125,13 @@ export default function WorkoutBuilderPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isMuscleGroupModalOpen, setIsMuscleGroupModalOpen] = useState(false);
   const [editingExerciseIndex, setEditingExerciseIndex] = useState<number | null>(null);
+  const [exerciseIndexToReplace, setExerciseIndexToReplace] = useState<number | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false);
   const [selectedExerciseCategory, setSelectedExerciseCategory] = useState<string | null>(null);
   const [currentWorkoutMuscleSummary, setCurrentWorkoutMuscleSummary] = useState<MuscleGroupSummary>({});
+  const [operationType, setOperationType] = useState<'add' | 'replace'>('add');
+
 
   const form = useForm<WorkoutFormData>({
     resolver: zodResolver(workoutFormSchema),
@@ -143,7 +146,7 @@ export default function WorkoutBuilderPage() {
     },
   });
 
-  const { fields, append, remove, move } = useFieldArray({
+  const { fields, append, remove, move, update } = useFieldArray({
     control: form.control,
     name: 'exercises',
   });
@@ -264,11 +267,10 @@ export default function WorkoutBuilderPage() {
     if (!isNaN(days) && days > 0) {
       const todayAnchor = startOfToday();
       const newDeadlineDate = addDays(todayAnchor, days);
-      // Only set deadline if daysForDeadline is driving it. If user picks a date, let it be.
       form.setValue('deadline', newDeadlineDate, { shouldValidate: true, shouldDirty: true });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedDaysForDeadline]);
+  }, [watchedDaysForDeadline, form.setValue]);
 
 
   const appendNewExercise = (isModelExercise = false, modelExerciseDetails?: ModelExercise) => {
@@ -307,7 +309,15 @@ export default function WorkoutBuilderPage() {
     setEditingExerciseIndex(null);
   };
 
-  const handleOpenCategoryModal = () => {
+  const handleOpenCategoryModalForAdd = () => {
+    setOperationType('add');
+    setExerciseIndexToReplace(null);
+    setIsCategoryModalOpen(true);
+  };
+
+  const handleOpenCategoryModalForReplace = (index: number) => {
+    setOperationType('replace');
+    setExerciseIndexToReplace(index);
     setIsCategoryModalOpen(true);
   };
 
@@ -318,18 +328,40 @@ export default function WorkoutBuilderPage() {
   };
 
   const handleModelExerciseSelected = (modelExercise: ModelExercise) => {
-    appendNewExercise(true, modelExercise);
+    if (operationType === 'replace' && exerciseIndexToReplace !== null) {
+      const currentExercise = form.getValues(`exercises.${exerciseIndexToReplace}`);
+      update(exerciseIndexToReplace, {
+        ...currentExercise, // Preserve ID, sets, reps
+        name: modelExercise.name,
+        muscleGroups: modelExercise.muscleGroups || [],
+        notes: modelExercise.description || '',
+        weight: modelExercise.defaultWeight || currentExercise.weight || '',
+        hasWarmup: determineModelExerciseWarmup(modelExercise),
+      });
+      toast({
+        title: "Exercício Trocado!",
+        description: `${modelExercise.name} substituiu o exercício anterior.`,
+      });
+    } else { // Default to add
+      appendNewExercise(true, modelExercise);
+      toast({
+        title: "Exercício Modelo Adicionado!",
+        description: `${modelExercise.name} foi adicionado ao seu treino.`,
+      });
+    }
     setIsSelectionModalOpen(false);
 
-    if (!form.getValues('name').trim() && selectedExerciseCategory) {
+    if (form.getValues('name').trim() === '' && selectedExerciseCategory && operationType === 'add') {
       form.setValue('name', selectedExerciseCategory, { shouldDirty: true });
     }
+    
+    setTimeout(() => {
+        const currentExercises = form.getValues('exercises');
+        suggestRepeatFrequencyDays(currentExercises);
+    }, 0);
 
     setSelectedExerciseCategory(null);
-    toast({
-      title: "Exercício Modelo Adicionado!",
-      description: `${modelExercise.name} foi adicionado ao seu treino.`,
-    });
+    setExerciseIndexToReplace(null);
   };
 
   async function onSubmit(values: WorkoutFormData) {
@@ -500,7 +532,11 @@ export default function WorkoutBuilderPage() {
                           <Calendar
                             mode="single"
                             selected={field.value}
-                            onSelect={field.onChange}
+                            onSelect={(date) => {
+                              field.onChange(date);
+                              // If user manually picks a date, clear daysForDeadline if you want the date to be the source of truth
+                              // form.setValue('daysForDeadline', '', { shouldDirty: true });
+                            }}
                             disabled={(date) => isBefore(date, startOfToday()) && !isEqual(date, startOfToday()) }
                             initialFocus
                             locale={ptBR}
@@ -554,6 +590,15 @@ export default function WorkoutBuilderPage() {
                     <div className="flex justify-between items-start mb-2">
                         <h3 className="font-medium text-lg pt-1">Exercício {index + 1}</h3>
                         <div className="flex gap-1">
+                             <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                onClick={() => handleOpenCategoryModalForReplace(index)}
+                                title="Trocar exercício"
+                            >
+                                <Replace className="h-4 w-4" />
+                            </Button>
                             <Button
                                 type="button"
                                 variant="outline"
@@ -574,7 +619,7 @@ export default function WorkoutBuilderPage() {
                             >
                                 <ArrowDown className="h-4 w-4" />
                             </Button>
-                            {fields.length > 0 && (
+                            {fields.length > 0 && ( // Show remove only if there's at least one, or more than one if you want to enforce min 1
                                 <Button
                                     type="button"
                                     variant="destructive"
@@ -698,7 +743,7 @@ export default function WorkoutBuilderPage() {
                     <Button
                     type="button"
                     variant="secondary"
-                    onClick={handleOpenCategoryModal}
+                    onClick={handleOpenCategoryModalForAdd}
                     >
                     <BookOpenCheck className="mr-2 h-4 w-4" /> Adicionar Exercício Modelo
                     </Button>
@@ -760,6 +805,7 @@ export default function WorkoutBuilderPage() {
           onClose={() => {
             setIsSelectionModalOpen(false);
             setSelectedExerciseCategory(null);
+            setExerciseIndexToReplace(null); 
           }}
           category={selectedExerciseCategory}
           exercises={modelExerciseData[selectedExerciseCategory] || []}
@@ -769,4 +815,3 @@ export default function WorkoutBuilderPage() {
     </AppLayout>
   );
 }
-

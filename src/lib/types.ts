@@ -32,6 +32,11 @@ export interface SessionExercisePerformance {
   isWarmupCompleted?: boolean; // Tracks if the warmup for this specific exercise is done
   isExerciseCompleted?: boolean; // Tracks if this specific exercise is done
   restTimes?: number[]; // Array to store up to 3 last rest times in seconds
+
+  // Fields for exercise substitution during a session
+  isSubstitution?: boolean;
+  originalExerciseId?: string; // ID of the exercise that was replaced
+  originalExerciseName?: string; // Name of the exercise that was replaced
 }
 
 export interface WorkoutSession {
@@ -62,4 +67,3 @@ export interface ModelExercise {
 export interface ModelExerciseCategories {
   [category: string]: ModelExercise[];
 }
-
