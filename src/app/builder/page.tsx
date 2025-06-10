@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -114,8 +114,7 @@ function determineModelExerciseWarmup(exerciseDetails?: ModelExercise): boolean 
   return true; 
 }
 
-
-export default function WorkoutBuilderPage() {
+function WorkoutBuilderClientContent() {
   const { addWorkout, updateWorkout, getWorkoutById, userSettings } = useAppContext();
   const { toast } = useToast();
   const router = useRouter();
@@ -813,5 +812,13 @@ export default function WorkoutBuilderPage() {
         />
       )}
     </AppLayout>
+  );
+}
+
+export default function WorkoutBuilderPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center items-center h-full text-lg">Carregando construtor...</div>}>
+      <WorkoutBuilderClientContent />
+    </Suspense>
   );
 }
