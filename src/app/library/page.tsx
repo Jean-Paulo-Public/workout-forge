@@ -43,7 +43,12 @@ export default function WorkoutLibraryPage() {
   
   const [isConfirmScheduleModalOpen, setIsConfirmScheduleModalOpen] = useState(false);
   const [generatedWorkoutForConfirmation, setGeneratedWorkoutForConfirmation] = useState<Omit<Workout, 'id'> | null>(null);
-  const [scheduleSuggestions, setScheduleSuggestions] = useState<{deadline?: string, frequency?: number}>({});
+  // Store all suggestions from template generation
+  const [scheduleSuggestions, setScheduleSuggestions] = useState<{
+    initialDeadlineISO?: string,
+    initialDaysForDeadline?: number,
+    suggestedRepeatFrequencyDays?: number
+  }>({});
 
   const [isReorderingActive, setIsReorderingActive] = useState(false);
   const [orderedWorkouts, setOrderedWorkouts] = useState<Workout[]>([]);
@@ -128,11 +133,12 @@ export default function WorkoutLibraryPage() {
 
   const handleSelectWorkoutTemplate = (templateKey: string) => {
     const generationResult = generateWorkoutFromTemplate(templateKey, userSettings, workouts);
-    if (generationResult) {
+    if (generationResult && generationResult.workoutData) {
       setGeneratedWorkoutForConfirmation(generationResult.workoutData);
       setScheduleSuggestions({
-        deadline: generationResult.suggestedDeadlineISO,
-        frequency: generationResult.suggestedFrequencyDays
+        initialDeadlineISO: generationResult.workoutData.deadline, // Deadline is now part of workoutData
+        initialDaysForDeadline: generationResult.workoutData.daysForDeadline, // DaysForDeadline is now part of workoutData
+        suggestedRepeatFrequencyDays: generationResult.suggestedFrequencyDays
       });
       setIsConfirmScheduleModalOpen(true);
     } else {
@@ -145,16 +151,22 @@ export default function WorkoutLibraryPage() {
     setIsTemplateModalOpen(false); 
   };
 
-  const handleConfirmSchedule = (useSuggestions: boolean) => {
+  const handleConfirmSchedule = (useSuggestedDeadlineAndDays: boolean, useSuggestedRepeatFrequency: boolean) => {
     if (generatedWorkoutForConfirmation) {
       let workoutToAdd = { ...generatedWorkoutForConfirmation };
-      if (useSuggestions) {
-        workoutToAdd.deadline = scheduleSuggestions.deadline;
-        workoutToAdd.repeatFrequencyDays = scheduleSuggestions.frequency;
-      } else {
+
+      if (!useSuggestedDeadlineAndDays) {
         workoutToAdd.deadline = undefined;
+        workoutToAdd.daysForDeadline = undefined;
+      }
+      // If true, deadline and daysForDeadline from template generation are already in workoutToAdd
+
+      if (useSuggestedRepeatFrequency) {
+        workoutToAdd.repeatFrequencyDays = scheduleSuggestions.suggestedRepeatFrequencyDays;
+      } else {
         workoutToAdd.repeatFrequencyDays = undefined;
       }
+
       addContextWorkout(workoutToAdd);
       toast({
         title: "Treino Adicionado!",
@@ -266,14 +278,19 @@ export default function WorkoutLibraryPage() {
                   {workout.description && (
                     <CardDescription>{workout.description}</CardDescription>
                   )}
-                   {workout.repeatFrequencyDays && (
+                   {workout.daysForDeadline && (
                     <CardDescription className="text-xs text-muted-foreground flex items-center mt-1">
-                      <Repeat className="h-3 w-3 mr-1" /> Repetir a cada {workout.repeatFrequencyDays} dia(s)
+                      <CalendarDays className="h-3 w-3 mr-1 text-purple-500" /> Prazo em: {workout.daysForDeadline} dia(s)
                     </CardDescription>
                   )}
                   {workout.deadline && (
                     <CardDescription className="text-xs text-muted-foreground flex items-center mt-1">
                       <CalendarDays className="h-3 w-3 mr-1 text-blue-500" /> Deadline: {format(parseISO(workout.deadline), "dd/MM/yyyy", { locale: ptBR })}
+                    </CardDescription>
+                  )}
+                  {workout.repeatFrequencyDays && (
+                    <CardDescription className="text-xs text-muted-foreground flex items-center mt-1">
+                      <Repeat className="h-3 w-3 mr-1" /> Descanso mínimo: {workout.repeatFrequencyDays} dia(s)
                     </CardDescription>
                   )}
                 </CardHeader>
@@ -371,14 +388,19 @@ export default function WorkoutLibraryPage() {
               {selectedWorkout.description && (
                 <AlertDialogDescription>{selectedWorkout.description}</AlertDialogDescription>
               )}
-               {selectedWorkout.repeatFrequencyDays && (
+              {selectedWorkout.daysForDeadline && (
                 <AlertDialogDescription className="text-xs text-muted-foreground flex items-center mt-1">
-                  <Repeat className="h-3 w-3 mr-1" /> Repetir a cada {selectedWorkout.repeatFrequencyDays} dia(s) após conclusão.
+                  <CalendarDays className="h-3 w-3 mr-1 text-purple-500" /> Prazo em: {selectedWorkout.daysForDeadline} dia(s) após conclusão/criação.
                 </AlertDialogDescription>
               )}
               {selectedWorkout.deadline && (
                 <AlertDialogDescription className="text-xs text-muted-foreground flex items-center mt-1">
-                  <CalendarDays className="h-3 w-3 mr-1 text-blue-500" /> Deadline: {format(parseISO(selectedWorkout.deadline), "dd/MM/yyyy", { locale: ptBR })}
+                  <CalendarDays className="h-3 w-3 mr-1 text-blue-500" /> Deadline Atual: {format(parseISO(selectedWorkout.deadline), "dd/MM/yyyy", { locale: ptBR })}
+                </AlertDialogDescription>
+              )}
+              {selectedWorkout.repeatFrequencyDays && (
+                <AlertDialogDescription className="text-xs text-muted-foreground flex items-center mt-1">
+                  <Repeat className="h-3 w-3 mr-1" /> Descanso mínimo: {selectedWorkout.repeatFrequencyDays} dia(s) após conclusão.
                 </AlertDialogDescription>
               )}
             </AlertDialogHeader>
@@ -451,11 +473,13 @@ export default function WorkoutLibraryPage() {
             setScheduleSuggestions({});
           }}
           workoutName={generatedWorkoutForConfirmation.name}
-          suggestedDeadlineISO={scheduleSuggestions.deadline}
-          suggestedFrequencyDays={scheduleSuggestions.frequency}
+          initialDeadlineISO={scheduleSuggestions.initialDeadlineISO}
+          initialDaysForDeadline={scheduleSuggestions.initialDaysForDeadline}
+          suggestedRepeatFrequencyDays={scheduleSuggestions.suggestedRepeatFrequencyDays}
           onConfirm={handleConfirmSchedule}
         />
       )}
     </AppLayout>
   );
 }
+

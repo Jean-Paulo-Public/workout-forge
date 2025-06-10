@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -89,6 +89,7 @@ const workoutFormSchema = z.object({
       message: "Adicione pelo menos um exercício preenchido.",
     }),
   repeatFrequencyDays: z.coerce.number().positive("A frequência deve ser um número positivo.").optional().or(z.literal('')),
+  daysForDeadline: z.coerce.number().positive("Deve ser um número positivo.").optional().or(z.literal('')),
   deadline: z.date().optional(),
 });
 
@@ -137,6 +138,7 @@ export default function WorkoutBuilderPage() {
       hasGlobalWarmup: true,
       exercises: [],
       repeatFrequencyDays: undefined,
+      daysForDeadline: undefined,
       deadline: undefined,
     },
   });
@@ -148,7 +150,7 @@ export default function WorkoutBuilderPage() {
 
   const isInitialLoadDoneRef = useRef(false);
 
-  const updateWorkoutFrequencyAndSuggestDeadline = useCallback((exercisesInput?: z.infer<typeof baseExerciseSchema>[]) => {
+  const suggestRepeatFrequencyDays = useCallback((exercisesInput?: z.infer<typeof baseExerciseSchema>[]) => {
     let maxSuggestedFrequency = 0;
     const exercisesToEvaluate = (exercisesInput || form.getValues('exercises'))
                                 .filter(ex => ex.name && ex.name.trim() !== '');
@@ -166,7 +168,7 @@ export default function WorkoutBuilderPage() {
     const currentFrequencyField = form.getValues('repeatFrequencyDays');
     if (currentFrequencyField === '' || currentFrequencyField === undefined || Number(currentFrequencyField) === 0) {
         if (maxSuggestedFrequency > 0) {
-            form.setValue('repeatFrequencyDays', maxSuggestedFrequency, { shouldDirty: true });
+            form.setValue('repeatFrequencyDays', maxSuggestedFrequency, { shouldDirty: true, shouldValidate: true });
         }
     }
   }, [form]);
@@ -194,13 +196,14 @@ export default function WorkoutBuilderPage() {
           hasGlobalWarmup: workoutToEdit.hasGlobalWarmup !== undefined ? workoutToEdit.hasGlobalWarmup : true,
           exercises: formExercises,
           repeatFrequencyDays: workoutToEdit.repeatFrequencyDays || undefined,
+          daysForDeadline: workoutToEdit.daysForDeadline || undefined,
           deadline: workoutToEdit.deadline ? parseISO(workoutToEdit.deadline) : undefined,
         });
 
         if (formExercises.length > 0) {
             setTimeout(() => {
                 const currentExercisesInForm = form.getValues('exercises');
-                updateWorkoutFrequencyAndSuggestDeadline(currentExercises);
+                suggestRepeatFrequencyDays(currentExercisesInForm);
             }, 0);
         }
       } else {
@@ -223,14 +226,15 @@ export default function WorkoutBuilderPage() {
           hasWarmup: false,
         }],
         repeatFrequencyDays: undefined,
+        daysForDeadline: undefined,
         deadline: undefined,
       });
     }
     setTimeout(() => { isInitialLoadDoneRef.current = true; }, 100);
-  }, [editingWorkoutId, getWorkoutById, form, toast, router, userSettings.defaultSets, userSettings.defaultReps, updateWorkoutFrequencyAndSuggestDeadline]);
+  }, [editingWorkoutId, getWorkoutById, form, toast, router, userSettings.defaultSets, userSettings.defaultReps, suggestRepeatFrequencyDays]);
 
 
-  const watchedRepeatFrequencyDays = form.watch('repeatFrequencyDays');
+  const watchedDaysForDeadline = form.watch('daysForDeadline');
   const watchedExercises = form.watch('exercises');
 
   useEffect(() => {
@@ -252,22 +256,19 @@ export default function WorkoutBuilderPage() {
   useEffect(() => {
     if (!isInitialLoadDoneRef.current) return;
 
-    const frequencyString = String(watchedRepeatFrequencyDays);
-    if (frequencyString === '' || frequencyString === 'undefined' || frequencyString === 'null') return;
+    const daysString = String(watchedDaysForDeadline);
+    if (daysString === '' || daysString === 'undefined' || daysString === 'null') return;
 
-    const frequency = parseInt(frequencyString, 10);
+    const days = parseInt(daysString, 10);
 
-    if (!isNaN(frequency) && frequency > 0) {
+    if (!isNaN(days) && days > 0) {
       const todayAnchor = startOfToday();
-      const suggestedDeadlineDate = addDays(todayAnchor, frequency);
-      const currentDeadline = form.getValues('deadline');
-
-      if (!currentDeadline || isBefore(startOfToday(currentDeadline), suggestedDeadlineDate) ) {
-        form.setValue('deadline', suggestedDeadlineDate, { shouldValidate: true, shouldDirty: true });
-      }
+      const newDeadlineDate = addDays(todayAnchor, days);
+      // Only set deadline if daysForDeadline is driving it. If user picks a date, let it be.
+      form.setValue('deadline', newDeadlineDate, { shouldValidate: true, shouldDirty: true });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedRepeatFrequencyDays]);
+  }, [watchedDaysForDeadline]);
 
 
   const appendNewExercise = (isModelExercise = false, modelExerciseDetails?: ModelExercise) => {
@@ -285,7 +286,7 @@ export default function WorkoutBuilderPage() {
     append(newExerciseData);
     setTimeout(() => {
         const currentExercises = form.getValues('exercises');
-        updateWorkoutFrequencyAndSuggestDeadline(currentExercises);
+        suggestRepeatFrequencyDays(currentExercises);
     }, 0);
   };
 
@@ -299,7 +300,7 @@ export default function WorkoutBuilderPage() {
       form.setValue(`exercises.${editingExerciseIndex}.muscleGroups`, groups, { shouldDirty: true });
       setTimeout(() => {
         const currentExercises = form.getValues('exercises');
-        updateWorkoutFrequencyAndSuggestDeadline(currentExercises);
+        suggestRepeatFrequencyDays(currentExercises);
       }, 0);
     }
     setIsMuscleGroupModalOpen(false);
@@ -341,14 +342,15 @@ export default function WorkoutBuilderPage() {
       exercises: values.exercises.map(ex => ({
         id: ex.id || generateId(),
         name: ex.name,
-        sets: ex.sets as number, // Zod ensures this is a number if valid
-        reps: ex.reps as string, // Zod ensures this is a string if valid
+        sets: ex.sets as number, 
+        reps: ex.reps as string, 
         weight: ex.weight || undefined,
         muscleGroups: ex.muscleGroups || [],
         notes: ex.notes || undefined,
         hasWarmup: ex.hasWarmup || false,
       })),
       repeatFrequencyDays: values.repeatFrequencyDays ? Number(values.repeatFrequencyDays) : undefined,
+      daysForDeadline: values.daysForDeadline ? Number(values.daysForDeadline) : undefined,
       deadline: values.deadline ? values.deadline.toISOString() : undefined,
     };
 
@@ -382,6 +384,7 @@ export default function WorkoutBuilderPage() {
                 hasWarmup: false,
             }],
             repeatFrequencyDays: undefined,
+            daysForDeadline: undefined,
             deadline: undefined,
         });
     }
@@ -452,19 +455,17 @@ export default function WorkoutBuilderPage() {
                     </FormItem>
                   )}
                 />
-                <FormField
+                 <FormField
                   control={form.control}
-                  name="repeatFrequencyDays"
+                  name="daysForDeadline"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Repetir a cada (dias) - Opcional</FormLabel>
+                      <FormLabel>Dias para Deadline (Define o próximo prazo)</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="ex: 7 (para repetir semanalmente)" {...field} onChange={e => field.onChange(e.target.value === '' ? '' : Number(e.target.value))} value={field.value ?? ''} />
+                        <Input type="number" placeholder="ex: 7 (para definir o deadline para 7 dias a partir de hoje/conclusão)" {...field} onChange={e => field.onChange(e.target.value === '' ? '' : Number(e.target.value))} value={field.value ?? ''} />
                       </FormControl>
                       <FormDescription>
-                        Define com que frequência este treino aparecerá na "Esteira de Treinos" após ser concluído ou se ainda não foi feito.
-                        Será sugerido automaticamente com base nos grupos musculares dos exercícios.
-                        Ajuste os dias de descanso conforme suas necessidades. Se possível, consulte um profissional de educação física.
+                        Número de dias a partir de hoje (ou da data de conclusão do treino) para definir a próxima data limite. Ex: 7 para uma semana.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -475,7 +476,7 @@ export default function WorkoutBuilderPage() {
                   name="deadline"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
-                      <FormLabel>Deadline (Data Limite) - Opcional</FormLabel>
+                      <FormLabel>Data Limite (Deadline) - Opcional</FormLabel>
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
@@ -507,7 +508,24 @@ export default function WorkoutBuilderPage() {
                         </PopoverContent>
                       </Popover>
                       <FormDescription>
-                        Defina uma data limite para este treino aparecer destacado na esteira. Será sugerido automaticamente se "Repetir a cada (dias)" for preenchido.
+                        Data limite para este treino. Será preenchido automaticamente se "Dias para Deadline" for informado, mas pode ser ajustado manualmente.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                 <FormField
+                  control={form.control}
+                  name="repeatFrequencyDays"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Dias de Descanso Mínimo (Disponibilidade na esteira)</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="ex: 3 (para reaparecer após 3 dias)" {...field} onChange={e => field.onChange(e.target.value === '' ? '' : Number(e.target.value))} value={field.value ?? ''} />
+                      </FormControl>
+                      <FormDescription>
+                        Número mínimo de dias de descanso antes deste treino reaparecer na "Esteira de Treinos" após ser concluído.
+                        Será sugerido automaticamente com base nos grupos musculares. Se possível, consulte um profissional.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -752,5 +770,3 @@ export default function WorkoutBuilderPage() {
   );
 }
 
-
-    

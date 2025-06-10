@@ -4,63 +4,91 @@
 import { useId } from 'react';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface ConfirmScheduleModalProps {
   isOpen: boolean;
   onClose: () => void;
   workoutName: string;
-  suggestedDeadlineISO: string | undefined;
-  suggestedFrequencyDays: number | undefined;
-  onConfirm: (useSuggestions: boolean) => void;
+  // deadline and daysForDeadline are now part of the workoutData passed to the library page
+  // We'll receive the initially calculated deadline and the daysForDeadline that led to it.
+  initialDeadlineISO: string | undefined; 
+  initialDaysForDeadline: number | undefined;
+  suggestedRepeatFrequencyDays: number | undefined; // For availability on mat
+  onConfirm: (useSuggestedDeadlineAndDays: boolean, useSuggestedRepeatFrequency: boolean) => void;
 }
 
 export function ConfirmScheduleModal({
   isOpen,
   onClose,
   workoutName,
-  suggestedDeadlineISO,
-  suggestedFrequencyDays,
+  initialDeadlineISO,
+  initialDaysForDeadline,
+  suggestedRepeatFrequencyDays,
   onConfirm,
 }: ConfirmScheduleModalProps) {
   const descriptionId = useId();
 
-  const handleConfirm = () => {
-    onConfirm(true);
+  const handleConfirmWithSuggestions = () => {
+    onConfirm(true, true);
   };
 
-  const handleDecline = () => {
-    onConfirm(false);
+  const handleConfirmWithoutSuggestions = () => {
+    onConfirm(false, false);
+  };
+  
+  const handleConfirmOnlyDeadline = () => {
+    onConfirm(true, false);
   };
 
-  let descriptionText = `Deseja definir um deadline e uma frequência de repetição para o treino "${workoutName}"?`;
-  const hasSuggestions = suggestedDeadlineISO || suggestedFrequencyDays;
+  const handleConfirmOnlyFrequency = () => {
+    onConfirm(false, true);
+  };
 
-  if (suggestedDeadlineISO && suggestedFrequencyDays) {
-    descriptionText = `Para o treino "${workoutName}", sugerimos um deadline em ${format(new Date(suggestedDeadlineISO), "PPP", { locale: ptBR })} (repetindo a cada ${suggestedFrequencyDays} dia(s)). Deseja usar essas sugestões?`;
-  } else if (suggestedDeadlineISO) {
-     descriptionText = `Para o treino "${workoutName}", sugerimos um deadline em ${format(new Date(suggestedDeadlineISO), "PPP", { locale: ptBR })}. A frequência de repetição não foi sugerida automaticamente. Deseja aplicar apenas o deadline?`;
-  } else if (suggestedFrequencyDays) {
-    descriptionText = `Para o treino "${workoutName}", sugerimos uma frequência de repetição a cada ${suggestedFrequencyDays} dia(s). O deadline não foi sugerido automaticamente. Deseja aplicar apenas a frequência?`;
+
+  let deadlineText = "Nenhum deadline sugerido.";
+  if (initialDeadlineISO && initialDaysForDeadline) {
+    deadlineText = `Sugerimos um deadline em ${format(parseISO(initialDeadlineISO), "PPP", { locale: ptBR })} (definido por ${initialDaysForDeadline} 'Dias para Deadline').`;
+  } else if (initialDeadlineISO) {
+    deadlineText = `Sugerimos um deadline em ${format(parseISO(initialDeadlineISO), "PPP", { locale: ptBR })}.`;
   }
+
+  let frequencyText = "Nenhuma frequência de descanso mínimo sugerida.";
+  if (suggestedRepeatFrequencyDays) {
+    frequencyText = `Sugerimos ${suggestedRepeatFrequencyDays} dia(s) de descanso mínimo (para disponibilidade na esteira).`;
+  }
+
+  const descriptionText = `Para o treino "${workoutName}": ${deadlineText} ${frequencyText} Deseja aplicar estas sugestões?`;
+  
+  const canUseDeadlineSuggestion = !!initialDeadlineISO;
+  const canUseFrequencySuggestion = !!suggestedRepeatFrequencyDays;
 
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md" aria-describedby={descriptionId}>
+      <DialogContent className="sm:max-w-lg" aria-describedby={descriptionId}>
         <DialogHeader>
           <DialogTitle className="font-headline">Agendar Treino Modelo</DialogTitle>
           <DialogDescription id={descriptionId}>
             {descriptionText}
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0 mt-4">
-          <Button variant="outline" onClick={onClose}>Cancelar Criação</Button>
-          <Button variant="secondary" onClick={handleDecline}>Não, deixar em branco</Button>
-          <Button onClick={handleConfirm} disabled={!hasSuggestions}>Sim, usar sugestões</Button>
+        <DialogFooter className="flex-col sm:flex-row gap-2 mt-4">
+          <Button variant="outline" onClick={onClose} className="w-full sm:w-auto">Cancelar Criação</Button>
+          <Button variant="secondary" onClick={handleConfirmWithoutSuggestions} className="w-full sm:w-auto">Não, deixar em branco</Button>
+          {canUseDeadlineSuggestion && !canUseFrequencySuggestion && (
+            <Button onClick={handleConfirmOnlyDeadline} className="w-full sm:w-auto">Sim, usar Deadline</Button>
+          )}
+          {!canUseDeadlineSuggestion && canUseFrequencySuggestion && (
+            <Button onClick={handleConfirmOnlyFrequency} className="w-full sm:w-auto">Sim, usar Descanso Mínimo</Button>
+          )}
+          {canUseDeadlineSuggestion && canUseFrequencySuggestion && (
+            <Button onClick={handleConfirmWithSuggestions} className="w-full sm:w-auto">Sim, usar ambas sugestões</Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
+

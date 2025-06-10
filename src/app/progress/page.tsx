@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useAppContext } from '@/contexts/AppContext';
 import type { Workout, WorkoutSession, Exercise as WorkoutExerciseType } from '@/lib/types'; // Renomeado para evitar conflito
 import { Play, Trash2, Flame, Undo2, BarChartHorizontalBig, Target } from 'lucide-react';
-// import Link from 'next/link'; // Não utilizado no momento
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,7 +27,6 @@ import { DeadlineUpdateModal } from '@/components/DeadlineUpdateModal';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Progress } from "@/components/ui/progress";
-// import { cn } from '@/lib/utils'; // Não utilizado no momento
 
 interface MuscleGroupSummary {
   [groupName: string]: number;
@@ -68,10 +66,8 @@ const ProgressTrackingPage = () => {
 
   const sortedSessions = useMemo(() => {
     return [...sessions].sort((a, b) => {
-      // Primeiro: sessões não concluídas
       if (!a.isCompleted && b.isCompleted) return -1;
       if (a.isCompleted && !b.isCompleted) return 1;
-      // Se ambos têm o mesmo status de conclusão, ordenar pela data (mais recente primeiro)
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
   }, [sessions]);
@@ -80,7 +76,6 @@ const ProgressTrackingPage = () => {
     const workout = getWorkoutById(session.workoutId);
     if (workout) {
       setTrackingSession(session);
-      // workoutForTrackingModal será atualizado pelo useEffect abaixo
       setIsTrackModalOpen(true);
     } else {
       toast({
@@ -104,22 +99,24 @@ const ProgressTrackingPage = () => {
   const handleWorkoutFinallyCompleted = useCallback(() => {
     if (trackingSession) {
       const workout = getWorkoutById(trackingSession.workoutId);
-      if (workout?.repeatFrequencyDays && workout.repeatFrequencyDays > 0) {
+      if (workout?.daysForDeadline && workout.daysForDeadline > 0) {
         setWorkoutToUpdateDeadline(workout);
         setIsDeadlineModalOpen(true);
-      } else if (workout?.deadline) {
+      } else if (workout?.deadline) { // If it had a deadline but no daysForDeadline
          toast({
           title: "Treino Concluído!",
-          description: `${workout.name} finalizado.`,
+          description: `${workout.name} finalizado. O deadline pode precisar ser ajustado manualmente no construtor.`,
+          duration: 5000,
         });
+        setTrackingSession(null); 
       } else if (workout) {
          toast({
           title: "Treino Concluído!",
           description: `${workout.name} finalizado.`,
         });
+        setTrackingSession(null);
       }
     }
-    // Não limpa trackingSession aqui, DeadlineUpdateModal o fará se necessário
   }, [trackingSession, getWorkoutById, toast]);
 
 
@@ -175,7 +172,6 @@ const ProgressTrackingPage = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {/* PlaceholderChart foi comentado e removido anteriormente para debugging */}
             <div className="bg-muted rounded-lg p-4 text-center text-sm text-muted-foreground">
               [Gráfico de Progresso - Em breve]
             </div>
@@ -325,7 +321,6 @@ const ProgressTrackingPage = () => {
           isOpen={isTrackModalOpen}
           onClose={() => {
             setIsTrackModalOpen(false);
-            // trackingSession não é limpo aqui para permitir que handleWorkoutFinallyCompleted funcione
           }}
           session={trackingSession}
           workout={workoutForTrackingModal}
@@ -350,5 +345,3 @@ const ProgressTrackingPage = () => {
 };
 export default ProgressTrackingPage;
 
-
-    
