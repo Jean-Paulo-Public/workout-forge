@@ -78,34 +78,70 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addWorkout = (workoutData: Omit<Workout, 'id'>) => {
     const newWorkout: Workout = {
-      ...workoutData, 
+      ...workoutData,
       id: generateId(),
-      exercises: workoutData.exercises.map(ex => ({ 
-        ...ex, 
-        id: ex.id || generateId(), 
+      exercises: workoutData.exercises.map(ex => ({
+        ...ex,
+        id: ex.id || generateId(),
       })),
     };
     setWorkouts((prev) => [...prev, newWorkout]);
   };
 
   const updateWorkout = (updatedWorkout: Workout) => {
-    setWorkouts((prev) =>
-      prev.map((w) => (w.id === updatedWorkout.id ? {
-        ...updatedWorkout,
-        repeatFrequencyDays: updatedWorkout.repeatFrequencyDays || undefined,
-        deadline: updatedWorkout.deadline || undefined,
-        hasGlobalWarmup: updatedWorkout.hasGlobalWarmup !== undefined ? updatedWorkout.hasGlobalWarmup : true,
-        exercises: updatedWorkout.exercises.map(ex => ({
-          ...ex,
-          id: ex.id || generateId(),
-          hasWarmup: ex.hasWarmup || false,
-        }))
-      } : w))
+    const fullyUpdatedWorkout: Workout = {
+      ...updatedWorkout,
+      repeatFrequencyDays: updatedWorkout.repeatFrequencyDays || undefined,
+      deadline: updatedWorkout.deadline || undefined,
+      hasGlobalWarmup: updatedWorkout.hasGlobalWarmup !== undefined ? updatedWorkout.hasGlobalWarmup : true,
+      exercises: updatedWorkout.exercises.map(ex => ({
+        ...ex,
+        id: ex.id || generateId(),
+        hasWarmup: ex.hasWarmup || false,
+      }))
+    };
+
+    setWorkouts((prevWorkouts) =>
+      prevWorkouts.map((w) => (w.id === fullyUpdatedWorkout.id ? fullyUpdatedWorkout : w))
+    );
+
+    // Sync active sessions
+    setSessions(prevSessions =>
+      prevSessions.map(session => {
+        if (session.workoutId === fullyUpdatedWorkout.id && !session.isCompleted) {
+          const newExercisePerformances: SessionExercisePerformance[] = fullyUpdatedWorkout.exercises.map(exerciseFromWorkout => {
+            const existingPerf = session.exercisePerformances.find(p => p.exerciseId === exerciseFromWorkout.id);
+            if (existingPerf) {
+              return { // Preserve existing performance data if exercise still exists
+                ...existingPerf,
+                exerciseName: exerciseFromWorkout.name, // Update name in case it changed
+                hasWarmup: exerciseFromWorkout.hasWarmup || false, // Update warmup status
+                plannedWeight: exerciseFromWorkout.weight || "0", // Update planned weight
+              };
+            } else { // New exercise added to workout
+              return {
+                exerciseId: exerciseFromWorkout.id,
+                exerciseName: exerciseFromWorkout.name,
+                plannedWeight: exerciseFromWorkout.weight || "0",
+                weightUsed: exerciseFromWorkout.weight || "0",
+                hasWarmup: exerciseFromWorkout.hasWarmup || false,
+                isWarmupCompleted: false,
+                isExerciseCompleted: false,
+                restTimes: [],
+              };
+            }
+          });
+          return { ...session, exercisePerformances: newExercisePerformances };
+        }
+        return session;
+      })
     );
   };
 
   const deleteWorkout = (workoutId: string) => {
     setWorkouts((prev) => prev.filter((w) => w.id !== workoutId));
+    // Optionally, also delete or mark as orphaned any sessions associated with this workoutId.
+    // For now, sessions remain but won't be easily accessible if workout details are gone.
   };
 
   const getWorkoutById = (workoutId: string): Workout | undefined => {
@@ -131,11 +167,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       exerciseId: ex.id,
       exerciseName: ex.name,
       plannedWeight: ex.weight || "0",
-      weightUsed: ex.weight || "0", 
+      weightUsed: ex.weight || "0",
       hasWarmup: ex.hasWarmup || false,
       isWarmupCompleted: false,
       isExerciseCompleted: false,
-      restTimes: [], // Initialize restTimes as an empty array
+      restTimes: [],
     }));
 
     const newSession: WorkoutSession = {
@@ -144,11 +180,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       isCompleted: false,
       notes: `Sessão de ${sessionData.workoutName} iniciada.`,
       exercisePerformances: initialExercisePerformances,
-      isGlobalWarmupCompleted: workout.hasGlobalWarmup ? false : undefined, 
+      isGlobalWarmupCompleted: workout.hasGlobalWarmup ? false : undefined,
     };
     setSessions((prev) => [newSession, ...prev]);
   };
-  
+
   const updateSessionExercisePerformance = useCallback((sessionId: string, exerciseId: string, updates: Partial<SessionExercisePerformance> & { logNewRestTime?: number }) => {
     setSessions(prevSessions =>
       prevSessions.map(session => {
@@ -160,19 +196,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 let newPerfData = { ...perf };
                 const { logNewRestTime, ...otherUpdates } = updates;
 
-                // Handle logging a new rest time
                 if (typeof logNewRestTime === 'number') {
                   const currentRestTimes = newPerfData.restTimes || [];
                   const updatedLog = [...currentRestTimes, logNewRestTime];
                   if (updatedLog.length > 3) {
-                    updatedLog.shift(); // Remove the oldest if more than 3
+                    updatedLog.shift();
                   }
                   newPerfData.restTimes = updatedLog;
                 }
-                
-                // Apply other updates (like isWarmupCompleted, weightUsed, or direct restTimes array from clear)
+
                 newPerfData = { ...newPerfData, ...otherUpdates };
-                
+
                 return newPerfData;
               }
               return perf;
@@ -231,7 +265,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteSession = (sessionId: string) => {
     setSessions(prev => prev.filter(s => s.id !== sessionId));
   };
-  
+
   const getSessionById = (sessionId: string): WorkoutSession | undefined => {
     return sessions.find(s => s.id === sessionId);
   };
@@ -281,11 +315,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 
   const updateUserSettings = (newSettings: Partial<UserSettings>) => {
-    setUserSettingsState(prev => ({ 
-      ...prev, 
+    setUserSettingsState(prev => ({
+      ...prev,
       ...newSettings,
-      defaultRestAlarmSeconds: newSettings.defaultRestAlarmSeconds !== undefined 
-                               ? Number(newSettings.defaultRestAlarmSeconds) 
+      defaultRestAlarmSeconds: newSettings.defaultRestAlarmSeconds !== undefined
+                               ? Number(newSettings.defaultRestAlarmSeconds)
                                : prev.defaultRestAlarmSeconds
     }));
   };
@@ -312,7 +346,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updateUserSettings,
   };
 
-  if (!isMounted) return null; 
+  if (!isMounted) return null;
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
@@ -324,3 +358,5 @@ export function useAppContext() {
   }
   return context;
 }
+
+    
