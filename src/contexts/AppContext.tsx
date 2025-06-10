@@ -3,8 +3,9 @@
 
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { Workout, WorkoutSession, UserSettings, Exercise, SessionExercisePerformance } from '@/lib/types';
+import type { Workout, WorkoutSession, UserSettings, Exercise, SessionExercisePerformance, ModelExercise } from '@/lib/types';
 import { parseISO, isWithinInterval } from 'date-fns';
+import { determineModelExerciseWarmup } from '@/lib/workout-templates';
 
 
 interface AppContextType {
@@ -18,6 +19,8 @@ interface AppContextType {
   sessions: WorkoutSession[];
   addSession: (sessionData: Pick<WorkoutSession, 'workoutId' | 'workoutName' | 'date'>) => void;
   updateSessionExercisePerformance: (sessionId: string, exerciseId: string, updates: Partial<SessionExercisePerformance> & { logNewRestTime?: number }) => void;
+  substituteSessionExercise: (sessionId: string, performanceIndexToReplace: number, newModelExercise: ModelExercise) => void;
+  undoSubstituteSessionExercise: (sessionId: string, performanceIndexToUndo: number) => void;
   markGlobalWarmupAsCompleted: (sessionId: string) => void;
   undoGlobalWarmup: (sessionId: string) => void;
   completeSession: (sessionId: string) => void;
@@ -25,7 +28,7 @@ interface AppContextType {
   getSessionById: (sessionId: string) => WorkoutSession | undefined;
   hasActiveSession: (workoutId: string) => boolean;
   getLastUsedWeightForExercise: (workoutId: string, exerciseId: string) => string | undefined;
-  getAverageRestTimeForExercise: (exerciseId: string, lastNDays?: number) => number | null;
+  getAverageRestTimeForExercise: (exerciseIdOrName: string, lastNDays?: number) => number | null;
 
 
   userSettings: UserSettings;
@@ -39,7 +42,7 @@ const generateId = () => crypto.randomUUID();
 const DEFAULT_USER_SETTINGS: UserSettings = {
   defaultSets: 3,
   defaultReps: '8',
-  defaultRestAlarmSeconds: 180, 
+  defaultRestAlarmSeconds: 180,
 };
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -90,6 +93,64 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setWorkouts((prev) => [...prev, newWorkout]);
   };
 
+  const getWorkoutById = (workoutId: string): Workout | undefined => {
+    return workouts.find(w => w.id === workoutId);
+  };
+
+  const getLastUsedWeightForExercise = useCallback((workoutId: string, exerciseId: string): string | undefined => {
+    const relevantSessions = sessions
+      .filter(s => s.workoutId === workoutId && s.isCompleted)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    for (const session of relevantSessions) {
+      const performance = session.exercisePerformances.find(p => p.exerciseId === exerciseId && !p.isSubstitution);
+      if (performance && performance.weightUsed !== undefined) {
+        return performance.weightUsed;
+      }
+    }
+    return undefined;
+  }, [sessions]);
+
+  const formatSecondsToMMSS = useCallback((totalSeconds: number | undefined | null): string => {
+    if (totalSeconds === undefined || totalSeconds === null || isNaN(totalSeconds)) return 'N/A';
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  }, []);
+  
+  const getAverageRestTimeForExercise = useCallback((exerciseIdOrName: string, lastNDays: number = 30): number | null => {
+    const today = new Date();
+    const pastDate = new Date(today);
+    pastDate.setDate(today.getDate() - lastNDays);
+
+    const allRestTimesForExercise: number[] = [];
+
+    sessions.forEach(session => {
+      if (session.isCompleted) {
+        const sessionDate = parseISO(session.date);
+        if (isWithinInterval(sessionDate, { start: pastDate, end: today })) {
+          session.exercisePerformances.forEach(perf => {
+            const matchesTarget = perf.exerciseId === exerciseIdOrName ||
+                                  perf.exerciseName === exerciseIdOrName ||
+                                  (perf.isSubstitution && perf.originalExerciseName === exerciseIdOrName);
+
+            if (matchesTarget && perf.restTimes && perf.restTimes.length > 0) {
+              perf.restTimes.forEach(time => {
+                if (typeof time === 'number' && !isNaN(time)) {
+                  allRestTimesForExercise.push(time);
+                }
+              });
+            }
+          });
+        }
+      }
+    });
+
+    if (allRestTimesForExercise.length === 0) return null;
+    const sum = allRestTimesForExercise.reduce((acc, time) => acc + time, 0);
+    return Math.round(sum / allRestTimesForExercise.length);
+  }, [sessions]);
+
   const updateWorkout = (updatedWorkout: Workout) => {
     const fullyUpdatedWorkout: Workout = {
       ...updatedWorkout,
@@ -112,49 +173,66 @@ export function AppProvider({ children }: { children: ReactNode }) {
       prevSessions.map(session => {
         if (session.workoutId === fullyUpdatedWorkout.id && !session.isCompleted) {
           const newExercisePerformances: SessionExercisePerformance[] = fullyUpdatedWorkout.exercises.map(exerciseFromWorkout => {
-            const existingPerf = session.exercisePerformances.find(p => p.exerciseId === exerciseFromWorkout.id || p.originalExerciseId === exerciseFromWorkout.id);
-            
+            const existingPerf = session.exercisePerformances.find(p =>
+              p.exerciseId === exerciseFromWorkout.id || 
+              (p.isSubstitution && p.originalExerciseId === exerciseFromWorkout.id) 
+            );
+
             if (existingPerf) {
-              // If it's a substitution, we don't want to overwrite its current state with the new workout plan's exercise,
-              // unless the original exercise it substituted was removed.
-              // For now, we mainly update name/plannedWeight if it's NOT a substitution, or if the originalId matches
-              if (!existingPerf.isSubstitution || existingPerf.originalExerciseId === exerciseFromWorkout.id) {
-                return { 
+              if (existingPerf.isSubstitution && existingPerf.originalExerciseId === exerciseFromWorkout.id) {
+                return {
                   ...existingPerf,
-                  // Update exerciseName and plannedWeight only if it's not a substitution OR if it's a substitution
-                  // and the original exercise (that was substituted) details are being updated from the workout plan.
-                  // This logic might need refinement depending on how substitutions are handled if the *original* exercise in the plan changes.
-                  // For now, keep it simple: update details if it's the direct exercise or the original of a substitution.
-                  exerciseName: existingPerf.isSubstitution ? existingPerf.exerciseName : exerciseFromWorkout.name, 
-                  plannedWeight: existingPerf.isSubstitution ? existingPerf.plannedWeight : (exerciseFromWorkout.weight || "0"),
-                  hasWarmup: existingPerf.isSubstitution ? existingPerf.hasWarmup : (exerciseFromWorkout.hasWarmup || false),
-                  // Keep originalExerciseId and originalExerciseName if it was a substitution.
+                  originalExerciseName: exerciseFromWorkout.name, 
+                  sets: exerciseFromWorkout.sets, // Reflect plan's sets
+                  reps: exerciseFromWorkout.reps, // Reflect plan's reps
+                };
+              } else if (!existingPerf.isSubstitution && existingPerf.exerciseId === exerciseFromWorkout.id) {
+                return {
+                  ...existingPerf,
+                  exerciseName: exerciseFromWorkout.name,
+                  plannedWeight: exerciseFromWorkout.weight || "0",
+                  hasWarmup: exerciseFromWorkout.hasWarmup || false,
+                  sets: exerciseFromWorkout.sets,
+                  reps: exerciseFromWorkout.reps,
                 };
               }
-              return existingPerf; // Keep substitution as is if its *original* wasn't the one directly modified.
-            } else { 
-              // New exercise added to the workout plan, create a new performance entry for it.
-              return {
-                exerciseId: exerciseFromWorkout.id,
-                exerciseName: exerciseFromWorkout.name,
-                plannedWeight: exerciseFromWorkout.weight || "0",
-                weightUsed: exerciseFromWorkout.weight || "0", // Default to planned or "0"
-                hasWarmup: exerciseFromWorkout.hasWarmup || false,
-                isWarmupCompleted: false,
-                isExerciseCompleted: false,
-                restTimes: [],
-                isSubstitution: false, // New exercises in the plan are not substitutions by default.
-                originalExerciseId: undefined,
-                originalExerciseName: undefined,
-              };
+              // If existingPerf is a substitution for a *different* original exercise, or some other case,
+              // it won't match above, so we need a fallback or decide how to handle it.
+              // For now, if it's not directly matched or a substitution for *this* plan slot,
+              // we create a new one. This handles cases where an exercise was replaced by another
+              // in the builder, and then that new exercise in the plan is now being processed.
             }
-          }).filter(perf => 
-            // Keep performance if it's for an exercise still in the workout OR if it's a substitution.
-            // Substitutions are kept because they represent user action during the session.
-            perf.isSubstitution || fullyUpdatedWorkout.exercises.some(ex => ex.id === perf.exerciseId)
-          ); 
+            // New exercise added to the plan or non-matching existing performance, create new.
+            const lastUsed = getLastUsedWeightForExercise(fullyUpdatedWorkout.id, exerciseFromWorkout.id);
+            const avgRest = getAverageRestTimeForExercise(exerciseFromWorkout.id, 30);
+            return {
+              exerciseId: exerciseFromWorkout.id,
+              exerciseName: exerciseFromWorkout.name,
+              plannedWeight: exerciseFromWorkout.weight || "0",
+              weightUsed: lastUsed || exerciseFromWorkout.weight || "0",
+              hasWarmup: exerciseFromWorkout.hasWarmup || false,
+              isWarmupCompleted: false,
+              isExerciseCompleted: false,
+              restTimes: [],
+              averageRestTimeDisplay: formatSecondsToMMSS(avgRest),
+              isSubstitution: false,
+              originalExerciseId: undefined,
+              originalExerciseName: undefined,
+              sets: exerciseFromWorkout.sets,
+              reps: exerciseFromWorkout.reps,
+            };
+          });
 
-          return { ...session, workoutName: fullyUpdatedWorkout.name, exercisePerformances: newExercisePerformances };
+          // Ensure the order of performances matches the order of exercises in the updated workout plan
+          const orderedPerformances: SessionExercisePerformance[] = [];
+          fullyUpdatedWorkout.exercises.forEach(planExercise => {
+            const foundPerf = newExercisePerformances.find(p => p.exerciseId === planExercise.id); // Direct match only for ordering based on current plan
+            if (foundPerf) {
+              orderedPerformances.push(foundPerf);
+            }
+          });
+
+          return { ...session, workoutName: fullyUpdatedWorkout.name, exercisePerformances: orderedPerformances };
         }
         return session;
       })
@@ -163,12 +241,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const deleteWorkout = (workoutId: string) => {
     setWorkouts((prev) => prev.filter((w) => w.id !== workoutId));
-    // Optionally: delete associated sessions or mark them as archived/orphaned
-    // setSessions(prev => prev.filter(s => s.workoutId !== workoutId));
-  };
-
-  const getWorkoutById = (workoutId: string): Workout | undefined => {
-    return workouts.find(w => w.id === workoutId);
   };
 
   const updateWorkoutsOrder = (newOrder: Workout[]) => {
@@ -186,19 +258,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const initialExercisePerformances: SessionExercisePerformance[] = workout.exercises.map(ex => ({
-      exerciseId: ex.id,
-      exerciseName: ex.name,
-      plannedWeight: ex.weight || "0",
-      weightUsed: ex.weight || "0", // Default to planned or "0"
-      hasWarmup: ex.hasWarmup || false,
-      isWarmupCompleted: false,
-      isExerciseCompleted: false,
-      restTimes: [],
-      isSubstitution: false,
-      originalExerciseId: undefined,
-      originalExerciseName: undefined,
-    }));
+    const initialExercisePerformances: SessionExercisePerformance[] = workout.exercises.map(ex => {
+      const lastUsed = getLastUsedWeightForExercise(workout.id, ex.id);
+      const avgRest = getAverageRestTimeForExercise(ex.id, 30);
+      return {
+        exerciseId: ex.id,
+        exerciseName: ex.name,
+        plannedWeight: ex.weight || "0",
+        weightUsed: lastUsed || ex.weight || "0",
+        hasWarmup: ex.hasWarmup || false,
+        isWarmupCompleted: false,
+        isExerciseCompleted: false,
+        restTimes: [],
+        averageRestTimeDisplay: formatSecondsToMMSS(avgRest),
+        isSubstitution: false,
+        originalExerciseId: undefined,
+        originalExerciseName: undefined,
+        sets: ex.sets, // Include from plan
+        reps: ex.reps,  // Include from plan
+      };
+    });
 
     const newSession: WorkoutSession = {
       ...sessionData,
@@ -228,25 +307,134 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 }
                 newPerfData.restTimes = updatedLog;
               }
-              
+
               if (updates.restTimes !== undefined) {
                   newPerfData.restTimes = updates.restTimes;
               }
-              
-              // Apply other direct updates
+
               newPerfData = { ...newPerfData, ...otherUpdates };
               return newPerfData;
             }
             return perf;
           });
-          // If a substitution occurs, the `updates` might include a full new performance object
-          // This part will need enhancement for the actual substitution logic in Phase 2
           return { ...session, exercisePerformances: newExercisePerformances };
         }
         return session;
       })
     );
   }, []);
+
+  const substituteSessionExercise = useCallback((sessionId: string, performanceIndexToReplace: number, newModelExercise: ModelExercise) => {
+    setSessions(prevSessions =>
+      prevSessions.map(session => {
+        if (session.id === sessionId) {
+          const currentWorkout = getWorkoutById(session.workoutId);
+          if (!currentWorkout) return session; 
+
+          const performanceToReplace = session.exercisePerformances[performanceIndexToReplace];
+          if (!performanceToReplace) return session;
+
+          const planExerciseId = performanceToReplace.isSubstitution
+            ? performanceToReplace.originalExerciseId!
+            : performanceToReplace.exerciseId;
+
+          const originalWorkoutExercise = currentWorkout.exercises.find(ex => ex.id === planExerciseId);
+          if (!originalWorkoutExercise) {
+            console.error("Original exercise in plan not found for substitution, slot:", planExerciseId);
+            return session; 
+          }
+
+          const newPerformance: SessionExercisePerformance = {
+            exerciseId: generateId(), 
+            exerciseName: newModelExercise.name,
+            hasWarmup: determineModelExerciseWarmup(newModelExercise),
+            isWarmupCompleted: false,
+            weightUsed: newModelExercise.defaultWeight || "0",
+            isExerciseCompleted: false,
+            plannedWeight: newModelExercise.defaultWeight || "0",
+            lastUsedWeight: "N/A", 
+            restTimes: [],
+            averageRestTimeDisplay: formatSecondsToMMSS(getAverageRestTimeForExercise(newModelExercise.name, 30)),
+            isSubstitution: true,
+            originalExerciseId: planExerciseId,
+            originalExerciseName: originalWorkoutExercise.name,
+            sets: originalWorkoutExercise.sets,
+            reps: originalWorkoutExercise.reps,
+          };
+
+          const newPerformances = [...session.exercisePerformances];
+          newPerformances[performanceIndexToReplace] = newPerformance;
+          return { ...session, exercisePerformances: newPerformances };
+        }
+        return session;
+      })
+    );
+  }, [getWorkoutById, getAverageRestTimeForExercise, formatSecondsToMMSS]);
+
+  const undoSubstituteSessionExercise = useCallback((sessionId: string, performanceIndexToUndo: number) => {
+    setSessions(prevSessions =>
+      prevSessions.map(session => {
+        if (session.id === sessionId) {
+          const currentWorkout = getWorkoutById(session.workoutId);
+          if (!currentWorkout) return session;
+
+          const performanceToUndo = session.exercisePerformances[performanceIndexToUndo];
+          if (!performanceToUndo || !performanceToUndo.isSubstitution || !performanceToUndo.originalExerciseId) {
+            return session; 
+          }
+
+          const originalExerciseInPlan = currentWorkout.exercises.find(ex => ex.id === performanceToUndo.originalExerciseId);
+          if (!originalExerciseInPlan) {
+            console.error("Original exercise for undo not found in current workout plan:", performanceToUndo.originalExerciseId);
+             const revertedPerformance: SessionExercisePerformance = {
+              exerciseId: performanceToUndo.originalExerciseId!,
+              exerciseName: performanceToUndo.originalExerciseName!,
+              hasWarmup: false, 
+              isWarmupCompleted: false,
+              weightUsed: getLastUsedWeightForExercise(currentWorkout.id, performanceToUndo.originalExerciseId!) || "0",
+              isExerciseCompleted: false,
+              plannedWeight: "0", 
+              lastUsedWeight: getLastUsedWeightForExercise(currentWorkout.id, performanceToUndo.originalExerciseId!) || "N/A",
+              restTimes: [],
+              averageRestTimeDisplay: formatSecondsToMMSS(getAverageRestTimeForExercise(performanceToUndo.originalExerciseId!, 30)),
+              isSubstitution: false,
+              originalExerciseId: undefined,
+              originalExerciseName: undefined,
+              sets: userSettings.defaultSets, 
+              reps: userSettings.defaultReps,  
+            };
+            const newPerformances = [...session.exercisePerformances];
+            newPerformances[performanceIndexToUndo] = revertedPerformance;
+            return { ...session, exercisePerformances: newPerformances };
+          }
+
+          const revertedPerformance: SessionExercisePerformance = {
+            exerciseId: originalExerciseInPlan.id,
+            exerciseName: originalExerciseInPlan.name,
+            hasWarmup: originalExerciseInPlan.hasWarmup || false,
+            isWarmupCompleted: false,
+            weightUsed: getLastUsedWeightForExercise(currentWorkout.id, originalExerciseInPlan.id) || originalExerciseInPlan.weight || "0",
+            isExerciseCompleted: false,
+            plannedWeight: originalExerciseInPlan.weight || "0",
+            lastUsedWeight: getLastUsedWeightForExercise(currentWorkout.id, originalExerciseInPlan.id) || "N/A",
+            restTimes: [],
+            averageRestTimeDisplay: formatSecondsToMMSS(getAverageRestTimeForExercise(originalExerciseInPlan.id, 30)),
+            isSubstitution: false,
+            originalExerciseId: undefined,
+            originalExerciseName: undefined,
+            sets: originalExerciseInPlan.sets,
+            reps: originalExerciseInPlan.reps,
+          };
+
+          const newPerformances = [...session.exercisePerformances];
+          newPerformances[performanceIndexToUndo] = revertedPerformance;
+          return { ...session, exercisePerformances: newPerformances };
+        }
+        return session;
+      })
+    );
+  }, [getWorkoutById, getLastUsedWeightForExercise, getAverageRestTimeForExercise, formatSecondsToMMSS, userSettings]);
+
 
   const markGlobalWarmupAsCompleted = useCallback((sessionId: string) => {
     setSessions(prevSessions =>
@@ -300,51 +488,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return sessions.find(s => s.id === sessionId);
   };
 
-  const getLastUsedWeightForExercise = useCallback((workoutId: string, exerciseId: string): string | undefined => {
-    const relevantSessions = sessions
-      .filter(s => s.workoutId === workoutId && s.isCompleted)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-    for (const session of relevantSessions) {
-      const performance = session.exercisePerformances.find(p => p.exerciseId === exerciseId && !p.isSubstitution); // Only consider original exercises for last used weight
-      if (performance && performance.weightUsed !== undefined) {
-        return performance.weightUsed;
-      }
-    }
-    return undefined;
-  }, [sessions]);
-
-  const getAverageRestTimeForExercise = useCallback((exerciseId: string, lastNDays: number = 30): number | null => {
-    const today = new Date();
-    const pastDate = new Date(today);
-    pastDate.setDate(today.getDate() - lastNDays);
-
-    const allRestTimesForExercise: number[] = [];
-
-    sessions.forEach(session => {
-      if (session.isCompleted) {
-        const sessionDate = parseISO(session.date);
-        if (isWithinInterval(sessionDate, { start: pastDate, end: today })) {
-          session.exercisePerformances.forEach(perf => {
-            // Consider rest times from both original and substituted exercises if they match the target exerciseId for averaging
-            if (perf.exerciseId === exerciseId && perf.restTimes && perf.restTimes.length > 0) {
-              perf.restTimes.forEach(time => {
-                if (typeof time === 'number' && !isNaN(time)) {
-                  allRestTimesForExercise.push(time);
-                }
-              });
-            }
-          });
-        }
-      }
-    });
-
-    if (allRestTimesForExercise.length === 0) return null;
-    const sum = allRestTimesForExercise.reduce((acc, time) => acc + time, 0);
-    return Math.round(sum / allRestTimesForExercise.length);
-  }, [sessions]);
-
-
   const updateUserSettings = (newSettings: Partial<UserSettings>) => {
     setUserSettingsState(prev => ({
       ...prev,
@@ -365,6 +508,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     sessions,
     addSession,
     updateSessionExercisePerformance,
+    substituteSessionExercise,
+    undoSubstituteSessionExercise,
     markGlobalWarmupAsCompleted,
     undoGlobalWarmup,
     completeSession,
@@ -376,8 +521,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     userSettings,
     updateUserSettings,
   };
-
-  if (!isMounted) return null;
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

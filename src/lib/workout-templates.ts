@@ -31,24 +31,24 @@ const exercisesWithoutIndividualWarmup = [
   'Crucifixo Invertido (Halteres ou Máquina)',
   'Encolhimento de Ombros (Halteres ou Barra)',
   'Desenvolvimento Arnold (Halteres)',
-  'Desenvolvimento Máquina', 
+  'Desenvolvimento Máquina',
   'Abdominal Supra (Crunch)',
   'Abdominal Infra (Elevação de Pernas)',
   'Abdominal Oblíquo (Bicicleta)',
   'Cadeira de Lombar (Hiperextensão)',
 ];
 
-function determineModelExerciseWarmup(exerciseDetails?: ModelExercise): boolean {
-  if (!exerciseDetails) return true; 
+export function determineModelExerciseWarmup(exerciseDetails?: ModelExercise): boolean {
+  if (!exerciseDetails) return true;
 
   const nameLower = exerciseDetails.name.toLowerCase();
   const isCardio = exerciseDetails.muscleGroups.includes('Cardio');
   const isHIIT = nameLower.includes('hiit');
 
-  if (isCardio && !isHIIT) return false; 
+  if (isCardio && !isHIIT) return false;
   if (exercisesWithoutIndividualWarmup.includes(exerciseDetails.name)) return false;
-  
-  return true; 
+
+  return true;
 }
 
 
@@ -113,7 +113,7 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
     name: "Treino Modelo - Ombros e Trapézio",
     description: "Um treino para desenvolver deltoides e trapézio (exercícios isolados/semi-isolados).",
     targetMuscleGroups: [
-      { group: 'Ombros', count: 2 }, 
+      { group: 'Ombros', count: 2 },
       { group: 'Trapézio', count: 1 },
     ],
     hasGlobalWarmup: true,
@@ -191,7 +191,6 @@ export const workoutTemplates: Record<string, WorkoutTemplate> = {
 interface GeneratedWorkoutOutput {
   workoutData: Omit<Workout, 'id'>;
   suggestedFrequencyDays?: number; // For repeatFrequencyDays (availability)
-  // daysForDeadline and deadline are now part of workoutData
 }
 
 const coreSpecificAbdominalExercises: ModelExercise[] = modelExerciseData['Outros'].filter(ex =>
@@ -213,7 +212,7 @@ const isolatedTricepsExercises: ModelExercise[] = modelExerciseData['Braços'].f
   ["Tríceps Testa (Barra EZ ou Halteres)", "Tríceps Pulley (Corda ou Barra)", "Tríceps Francês (Halter, Barra EZ ou Barra)"].includes(ex.name)
 );
 
-const isolatedShoulderPressExercises: ModelExercise[] = modelExerciseData['Ombros'].filter(ex => 
+const isolatedShoulderPressExercises: ModelExercise[] = modelExerciseData['Ombros'].filter(ex =>
   ["Desenvolvimento Arnold (Halteres)", "Desenvolvimento Máquina"].includes(ex.name)
 );
 const isolatedShoulderRaisesAndFlyes: ModelExercise[] = modelExerciseData['Ombros'].filter(ex =>
@@ -260,7 +259,7 @@ export function generateWorkoutFromTemplate(
     } else if (isArmsTemplate) {
       if (target.group === 'Bíceps') candidatePool = [...isolatedBicepsExercises];
       else if (target.group === 'Tríceps') candidatePool = [...isolatedTricepsExercises];
-      else if (target.group === 'Antebraço') candidatePool = [...coreSpecificAntebracoExercises]; // Can be targeted by Arms template too
+      else if (target.group === 'Antebraço') candidatePool = [...coreSpecificAntebracoExercises]; 
       else candidatePool = [];
     } else if (isShouldersTemplate) {
       if (target.group === 'Ombros') {
@@ -273,10 +272,10 @@ export function generateWorkoutFromTemplate(
         modelEx.muscleGroups.includes(target.group)
       );
     }
-    
+
     let candidates = candidatePool.filter(modelEx => !usedExerciseNamesInCurrentWorkout.has(modelEx.name));
-    
-    if (!isCoreTemplate && !isArmsTemplate && !isShouldersTemplate) { 
+
+    if (!isCoreTemplate && !isArmsTemplate && !isShouldersTemplate) {
         candidates.sort((a, b) => a.muscleGroups.length - b.muscleGroups.length);
     }
 
@@ -305,7 +304,7 @@ export function generateWorkoutFromTemplate(
             }
         }
     }
-    
+
     if (exercisesForThisGroupTarget.length < target.count && candidatePool.length > 0) {
       const remainingCandidates = candidatePool.filter(c => !usedExerciseNamesInCurrentWorkout.has(c.name));
       shuffleArray(remainingCandidates);
@@ -326,7 +325,7 @@ export function generateWorkoutFromTemplate(
 
       if (exerciseSpecificWarmup && target.count > 1 && !isCoreTemplate && !isArmsTemplate && !isShouldersTemplate) {
         if (assignedWarmupForGroup.has(target.group)) {
-          exerciseSpecificWarmup = false; 
+          exerciseSpecificWarmup = false;
         } else {
           assignedWarmupForGroup.add(target.group);
         }
@@ -348,22 +347,21 @@ export function generateWorkoutFromTemplate(
       console.warn(`Nenhum exercício gerado para o modelo: ${templateKey}`);
   }
 
-  // Calculate suggested repeatFrequencyDays (for availability on mat)
   let suggestedFrequencyDays: number | undefined = undefined;
   const majorMuscleGroupsForFrequency = [
-    'Peito', 'Costas', 
-    'Pernas (Quadríceps)', 'Pernas (Posteriores)', 'Glúteos', 
+    'Peito', 'Costas',
+    'Pernas (Quadríceps)', 'Pernas (Posteriores)', 'Glúteos',
     'Lombar'
   ];
 
   if (templateKey.includes("_Mini")) {
-    const hasMajorMuscle = generatedExercises.some(ex => 
+    const hasMajorMuscle = generatedExercises.some(ex =>
         ex.muscleGroups?.some(group => majorMuscleGroupsForFrequency.includes(group))
     );
     suggestedFrequencyDays = hasMajorMuscle ? 2 : 1;
   } else if (isCoreTemplate || isArmsTemplate || isShouldersTemplate) {
-      suggestedFrequencyDays = 2; 
-  } else { 
+      suggestedFrequencyDays = 2;
+  } else {
     let maxSuggestedFrequency = 0;
     generatedExercises.forEach(exercise => {
       if (exercise.muscleGroups && exercise.muscleGroups.length > 0) {
@@ -378,8 +376,7 @@ export function generateWorkoutFromTemplate(
       suggestedFrequencyDays = maxSuggestedFrequency;
     }
   }
-  
-  // Set daysForDeadline and initial deadline from template default
+
   const daysForDeadlineToSet = template.defaultDaysForDeadline || 7;
   const initialDeadlineISO = addDays(startOfToday(), daysForDeadlineToSet).toISOString();
 
@@ -387,16 +384,15 @@ export function generateWorkoutFromTemplate(
     name: template.name,
     description: template.description,
     exercises: generatedExercises,
-    hasGlobalWarmup: template.hasGlobalWarmup !== undefined ? template.hasGlobalWarmup : 
+    hasGlobalWarmup: template.hasGlobalWarmup !== undefined ? template.hasGlobalWarmup :
                      (isCoreTemplate ? false : true),
     daysForDeadline: daysForDeadlineToSet,
     deadline: initialDeadlineISO,
-    repeatFrequencyDays: undefined, // This will be set by user via ConfirmScheduleModal
+    repeatFrequencyDays: undefined,
   };
 
   return {
-    workoutData, // Contains daysForDeadline and initial deadline
-    suggestedFrequencyDays, // For repeatFrequencyDays
+    workoutData,
+    suggestedFrequencyDays,
   };
 }
-
